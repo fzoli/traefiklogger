@@ -1,3 +1,3 @@
-module github.com/traefik/plugindemo
+module github.com/fzoli/traefiklogger
 
 go 1.19

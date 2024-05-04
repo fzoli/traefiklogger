@@ -1,12 +1,11 @@
-displayName: Demo Plugin
+displayName: HTTP Logger Plugin
 type: middleware
 iconPath: .assets/icon.png
 
-import: github.com/traefik/plugindemo
+import: github.com/fzoli/traefiklogger
 
-summary: '[Demo] Add Request Header'
+summary: 'Prints each HTTP request and response with body to standard output.'
 
 testData:
   Headers:
-    X-Demo: test
-    X-URL: '{{URL}}'
+    Foo: Bar

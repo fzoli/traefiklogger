@@ -1,8 +1,4 @@
-This repository includes an example plugin, `demo`, for you to use as a reference for developing your own plugins.
-
-[![Build Status](https://github.com/traefik/plugindemo/workflows/Main/badge.svg?branch=master)](https://github.com/traefik/plugindemo/actions)
-
-The existing plugins can be browsed into the [Plugin Catalog](https://plugins.traefik.io).
+[![Build Status](https://github.com/fzoli/traefiklogger/workflows/Main/badge.svg?branch=main)](https://github.com/fzoli/traefiklogger/actions)
 
 # Developing a Traefik plugin
 
@@ -39,8 +35,8 @@ The following declaration (given here in YAML) defines a plugin:
 experimental:
   plugins:
     example:
-      moduleName: github.com/traefik/plugindemo
-      version: v0.2.1
+      moduleName: github.com/fzoli/traefiklogger
+      version: v0.1.0
 ```
 
 Here is an example of a file provider dynamic configuration (given here in YAML), where the interesting part is the `http.middlewares` section:
@@ -85,10 +81,10 @@ The source code of the plugin should be organized as follows:
 ./plugins-local/
     └── src
         └── github.com
-            └── traefik
-                └── plugindemo
-                    ├── demo.go
-                    ├── demo_test.go
+            └── fzoli
+                └── traefiklogger
+                    ├── plugin.go
+                    ├── plugin_test.go
                     ├── go.mod
                     ├── LICENSE
                     ├── Makefile
@@ -101,10 +97,10 @@ The source code of the plugin should be organized as follows:
 experimental:
   localPlugins:
     example:
-      moduleName: github.com/traefik/plugindemo
+      moduleName: github.com/fzoli/traefiklogger
 ```
 
-(In the above example, the `plugindemo` plugin will be loaded from the path `./plugins-local/src/github.com/traefik/plugindemo`.)
+(In the above example, the `traefiklogger` plugin will be loaded from the path `./plugins-local/src/github.com/fzoli/traefiklogger`.)
 
 ```yaml
 # Dynamic configuration

@@ -1,4 +1,4 @@
-package plugindemo_test
+package traefiklogger_test
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/traefik/plugindemo"
+	"github.com/fzoli/traefiklogger"
 )
 
 func TestPost(t *testing.T) {
-	cfg := &plugindemo.Config{}
+	cfg := &traefiklogger.Config{}
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -41,7 +41,7 @@ func TestPost(t *testing.T) {
 		fmt.Fprintf(rw, "%d", result)
 	})
 
-	handler, err := plugindemo.New(ctx, next, cfg, "demo-plugin")
+	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestPost(t *testing.T) {
 }
 
 func TestEmptyPost(t *testing.T) {
-	cfg := &plugindemo.Config{}
+	cfg := &traefiklogger.Config{}
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -76,7 +76,7 @@ func TestEmptyPost(t *testing.T) {
 		rw.WriteHeader(http.StatusOK)
 	})
 
-	handler, err := plugindemo.New(ctx, next, cfg, "demo-plugin")
+	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestEmptyPost(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	cfg := &plugindemo.Config{}
+	cfg := &traefiklogger.Config{}
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -106,7 +106,7 @@ func TestGet(t *testing.T) {
 		fmt.Fprintf(rw, "%d", 5)
 	})
 
-	handler, err := plugindemo.New(ctx, next, cfg, "demo-plugin")
+	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,14 +127,14 @@ func TestGet(t *testing.T) {
 }
 
 func TestEmptyGet(t *testing.T) {
-	cfg := &plugindemo.Config{}
+	cfg := &traefiklogger.Config{}
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 	})
 
-	handler, err := plugindemo.New(ctx, next, cfg, "demo-plugin")
+	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,5 +1,5 @@
-// Package plugindemo a demo plugin.
-package plugindemo
+// Package traefiklogger a Traefik HTTP logger plugin.
+package traefiklogger
 
 import (
 	"bytes"
