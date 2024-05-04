@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -24,7 +25,12 @@ func TestPost(t *testing.T) {
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		defer req.Body.Close()
+		defer func(Body io.ReadCloser) {
+			cerr := Body.Close()
+			if cerr != nil {
+				log.Printf("Failed to close reader: %v", cerr)
+			}
+		}(req.Body)
 
 		// Parse the request body as an integer
 		num, err := strconv.Atoi(string(body))
@@ -72,7 +78,12 @@ func TestEmptyPost(t *testing.T) {
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		defer req.Body.Close()
+		defer func(Body io.ReadCloser) {
+			cerr := Body.Close()
+			if cerr != nil {
+				log.Printf("Failed to close reader: %v", cerr)
+			}
+		}(req.Body)
 		rw.WriteHeader(http.StatusOK)
 	})
 

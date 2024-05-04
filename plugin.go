@@ -11,8 +11,7 @@ import (
 )
 
 // Config the plugin configuration.
-type Config struct {
-}
+type Config struct{}
 
 // LoggerMiddleware a Logger plugin.
 type LoggerMiddleware struct {
