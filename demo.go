@@ -4,63 +4,87 @@ package plugindemo
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"io"
+	"log"
 	"net/http"
-	"text/template"
+	"os"
 )
 
 // Config the plugin configuration.
 type Config struct {
-	Headers map[string]string `json:"headers,omitempty"`
 }
 
-// CreateConfig creates the default plugin configuration.
-func CreateConfig() *Config {
-	return &Config{
-		Headers: make(map[string]string),
-	}
+// LoggerMiddleware a Logger plugin.
+type LoggerMiddleware struct {
+	logger *log.Logger
+	next   http.Handler
 }
 
-// Demo a Demo plugin.
-type Demo struct {
-	next     http.Handler
-	headers  map[string]string
-	name     string
-	template *template.Template
-}
-
-// New created a new Demo plugin.
+// New creates a new LoggerMiddleware plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	if len(config.Headers) == 0 {
-		return nil, fmt.Errorf("headers cannot be empty")
-	}
-
-	return &Demo{
-		headers:  config.Headers,
-		next:     next,
-		name:     name,
-		template: template.New("demo").Delims("[[", "]]"),
+	logger := log.New(os.Stdout, "[HTTP] ", log.LstdFlags)
+	return &LoggerMiddleware{
+		logger: logger,
+		next:   next,
 	}, nil
 }
 
-func (a *Demo) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	for key, value := range a.headers {
-		tmpl, err := a.template.Parse(value)
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
+func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	requestBody := &bytes.Buffer{}
 
-		writer := &bytes.Buffer{}
-
-		err = tmpl.Execute(writer, req)
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		req.Header.Set(key, writer.String())
+	mrc := &multiReadCloser{
+		rc:  r.Body,
+		buf: requestBody,
 	}
+	r.Body = mrc
 
-	a.next.ServeHTTP(rw, req)
+	mrw := &multiResponseWriter{
+		ResponseWriter: w,
+		status:         200, // Default is 200
+		body:           &bytes.Buffer{},
+	}
+	m.next.ServeHTTP(mrw, r)
+
+	m.logger.Printf("%s %s %s : Status %d %s\nRequest Body: %s\nResponse Body: %s\nResponse Content Length: %d\n",
+		r.RemoteAddr, r.Method, r.URL.String(),
+		mrw.status, http.StatusText(mrw.status),
+		requestBody.String(), mrw.body.String(),
+		mrw.length,
+	)
+}
+
+type multiResponseWriter struct {
+	http.ResponseWriter
+	status int
+	length int
+	body   *bytes.Buffer
+}
+
+func (w *multiResponseWriter) WriteHeader(status int) {
+	w.ResponseWriter.WriteHeader(status)
+	w.status = status
+}
+
+func (w *multiResponseWriter) Write(b []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(b)
+	w.length += n
+	w.body.Write(b)
+	return n, err
+}
+
+type multiReadCloser struct {
+	rc  io.ReadCloser
+	buf *bytes.Buffer
+}
+
+func (mrc *multiReadCloser) Read(p []byte) (int, error) {
+	n, err := mrc.rc.Read(p)
+	if n > 0 {
+		mrc.buf.Write(p[:n])
+	}
+	return n, err
+}
+
+func (mrc *multiReadCloser) Close() error {
+	return mrc.rc.Close()
 }
