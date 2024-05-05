@@ -80,13 +80,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		responseHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
 	}
 
-	m.logger.Printf("%s %s %s: %d %s %s\n\nRequest Headers:\n%s\nRequest Body:\n%s\n\nResponse Headers:\n%s\nResponse Body:\n%s\n\nResponse Content Length: %d\n\n",
-		r.RemoteAddr, r.Method, r.URL.String(),
-		mrw.status, http.StatusText(mrw.status), r.Proto,
-		requestHeaders, requestBody.String(),
-		responseHeaders, mrw.body.String(),
-		mrw.length,
-	)
+	m.logger.Print(createLog(r, mrw, requestHeaders, requestBody, responseHeaders))
 }
 
 type multiResponseWriter struct {
@@ -123,4 +117,31 @@ func (mrc *multiReadCloser) Read(p []byte) (int, error) {
 
 func (mrc *multiReadCloser) Close() error {
 	return mrc.rc.Close()
+}
+
+func createLog(r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string) string {
+	logMessage := fmt.Sprintf("%s %s %s: %d %s %s\n",
+		r.RemoteAddr, r.Method, r.URL.String(),
+		mrw.status, http.StatusText(mrw.status), r.Proto,
+	)
+
+	if len(requestHeaders) > 0 {
+		logMessage += "\nRequest Headers:\n" + requestHeaders
+	}
+
+	if requestBody.Len() > 0 {
+		logMessage += "\nRequest Body:\n" + requestBody.String() + "\n"
+	}
+
+	if len(responseHeaders) > 0 {
+		logMessage += "\nResponse Headers:\n" + responseHeaders
+	}
+
+	logMessage += fmt.Sprintf("\nResponse Content Length: %d\n", mrw.length)
+
+	if mrw.body.Len() > 0 {
+		logMessage += "\nResponse Body:\n" + mrw.body.String() + "\n"
+	}
+
+	return logMessage + "\n"
 }
