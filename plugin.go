@@ -80,9 +80,9 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		responseHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
 	}
 
-	m.logger.Printf("%s %s %s : Status %d %s\nRequest Headers:\n%s\nRequest Body: %s\nResponse Headers:\n%s\nResponse Body: %s\nResponse Content Length: %d\n",
+	m.logger.Printf("%s %s %s: %d %s %s\n\nRequest Headers:\n%s\nRequest Body:\n%s\n\nResponse Headers:\n%s\nResponse Body:\n%s\n\nResponse Content Length: %d\n\n",
 		r.RemoteAddr, r.Method, r.URL.String(),
-		mrw.status, http.StatusText(mrw.status),
+		mrw.status, http.StatusText(mrw.status), r.Proto,
 		requestHeaders, requestBody.String(),
 		responseHeaders, mrw.body.String(),
 		mrw.length,
