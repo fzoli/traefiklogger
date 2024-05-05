@@ -1,5 +1,5 @@
 ## Start services
-Execute this command from this directory to start the example services:
+Execute this command **from this directory** to start the example services:
 
 `docker compose up -d`
 
@@ -15,7 +15,7 @@ Or use command line curl:
 
 ## Watch logs
 
-Execute this command from this directory:
+Execute this command **from this directory**:
 
 `docker compose logs -f traefik`
 

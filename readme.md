@@ -1,4 +1,6 @@
-[![Build Status](https://github.com/fzoli/traefiklogger/workflows/Main/badge.svg?branch=main)](https://github.com/fzoli/traefiklogger/actions)
+# First of all
+
+[Usage example](https://github.com/fzoli/traefiklogger/tree/main/docker)
 
 # Developing a Traefik plugin
 
