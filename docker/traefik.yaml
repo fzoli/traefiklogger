@@ -1,0 +1,20 @@
+entryPoints:
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true
+api:
+  dashboard: true
+  insecure: true
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+experimental:
+#  localPlugins: # use this block instead for plugin development
+#    traefiklogger:
+#      moduleName: "github.com/fzoli/traefiklogger"
+  plugins:
+    traefiklogger:
+      moduleName: "github.com/fzoli/traefiklogger"
+      version: "v0.3.0"
