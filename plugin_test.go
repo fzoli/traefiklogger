@@ -164,3 +164,34 @@ func TestEmptyGet(t *testing.T) {
 		t.Errorf("Expected response body: '', got: '%s'", recorder.Body.String())
 	}
 }
+
+func TestDisabled(t *testing.T) {
+	cfg := &traefiklogger.Config{
+		Enabled: false,
+	}
+
+	ctx := context.Background()
+	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		fmt.Fprintf(rw, "%d", 5)
+	})
+
+	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/disabled", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler.ServeHTTP(recorder, req)
+
+	// Check the response body
+	if recorder.Body.String() != "5" {
+		t.Errorf("Expected response body: '5', got: '%s'", recorder.Body.String())
+	}
+}

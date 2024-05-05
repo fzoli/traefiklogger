@@ -7,5 +7,4 @@ import: github.com/fzoli/traefiklogger
 summary: 'Prints each HTTP request and response with body to standard output.'
 
 testData:
-  Headers:
-    Foo: Bar
+  Enabled: true
