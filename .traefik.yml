@@ -8,3 +8,4 @@ summary: 'Prints each HTTP request and response with body to standard output.'
 
 testData:
   Enabled: true
+  Name: HTTP

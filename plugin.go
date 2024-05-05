@@ -14,7 +14,8 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled bool `json:"enabled"`
+	Enabled bool   `json:"enabled"`
+	Name    string `json:"name,omitempty"`
 }
 
 // NoOpMiddleware a no-op plugin implementation.
@@ -36,6 +37,7 @@ type LoggerMiddleware struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled: true,
+		Name:    "HTTP",
 	}
 }
 
@@ -46,7 +48,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			next: next,
 		}, nil
 	}
-	logger := log.New(os.Stdout, "[HTTP] ", log.LstdFlags)
+	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
 	return &LoggerMiddleware{
 		logger: logger,
 		next:   next,
