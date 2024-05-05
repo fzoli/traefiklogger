@@ -4,10 +4,12 @@ package traefiklogger
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // Config the plugin configuration.
@@ -65,12 +67,24 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
 	}
+
+	requestHeaders := ""
+	for key, values := range r.Header {
+		requestHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+	}
+
 	m.next.ServeHTTP(mrw, r)
 
-	m.logger.Printf("%s %s %s : Status %d %s\nRequest Body: %s\nResponse Body: %s\nResponse Content Length: %d\n",
+	responseHeaders := ""
+	for key, values := range w.Header() {
+		responseHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+	}
+
+	m.logger.Printf("%s %s %s : Status %d %s\nRequest Headers:\n%s\nRequest Body: %s\nResponse Headers:\n%s\nResponse Body: %s\nResponse Content Length: %d\n",
 		r.RemoteAddr, r.Method, r.URL.String(),
 		mrw.status, http.StatusText(mrw.status),
-		requestBody.String(), mrw.body.String(),
+		requestHeaders, requestBody.String(),
+		responseHeaders, mrw.body.String(),
 		mrw.length,
 	)
 }

@@ -44,6 +44,7 @@ func TestPost(t *testing.T) {
 
 		// Write the result as the response body
 		rw.WriteHeader(http.StatusOK)
+		rw.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(rw, "%d", result)
 	})
 
@@ -58,6 +59,7 @@ func TestPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Set("Accept", "text/plain")
 
 	handler.ServeHTTP(recorder, req)
 
