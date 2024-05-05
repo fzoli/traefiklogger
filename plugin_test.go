@@ -15,7 +15,7 @@ import (
 )
 
 func TestPost(t *testing.T) {
-	cfg := &traefiklogger.Config{}
+	cfg := traefiklogger.CreateConfig()
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -68,7 +68,7 @@ func TestPost(t *testing.T) {
 }
 
 func TestEmptyPost(t *testing.T) {
-	cfg := &traefiklogger.Config{}
+	cfg := traefiklogger.CreateConfig()
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -108,7 +108,7 @@ func TestEmptyPost(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	cfg := &traefiklogger.Config{}
+	cfg := traefiklogger.CreateConfig()
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -138,7 +138,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestEmptyGet(t *testing.T) {
-	cfg := &traefiklogger.Config{}
+	cfg := traefiklogger.CreateConfig()
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {

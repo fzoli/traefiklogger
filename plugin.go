@@ -19,6 +19,11 @@ type LoggerMiddleware struct {
 	next   http.Handler
 }
 
+// CreateConfig creates the default plugin configuration.
+func CreateConfig() *Config {
+	return &Config{}
+}
+
 // New creates a new LoggerMiddleware plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	logger := log.New(os.Stdout, "[HTTP] ", log.LstdFlags)
