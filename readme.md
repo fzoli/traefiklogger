@@ -1,6 +1,6 @@
 # First of all
 
-[Usage example](https://github.com/fzoli/traefiklogger/tree/main/docker)
+[Usage example](https://raw.githubusercontent.com/fzoli/traefiklogger/main/docker/README.md)
 
 # Developing a Traefik plugin
 
