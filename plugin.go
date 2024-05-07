@@ -70,36 +70,22 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			next: next,
 		}, nil
 	}
-	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
-	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
-	var httpLogger HTTPLogger
-	switch config.LogFormat {
-	case JSONFormat:
-		var clock LoggerClock
-		externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
-		if hasExternalClock {
-			clock = externalClock
-		} else {
-			clock = &SystemLoggerClock{}
-		}
-		if hasExternalLogWriter {
-			httpLogger = &JSONHTTPLogger{clock: clock, logger: logger, writer: externalLogWriter}
-		} else {
-			httpLogger = &JSONHTTPLogger{clock: clock, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
-		}
-	default:
-		if hasExternalLogWriter {
-			httpLogger = &TextualHTTPLogger{logger: logger, writer: externalLogWriter}
-		} else {
-			httpLogger = &TextualHTTPLogger{logger: logger, writer: &LoggerLogWriter{logger: logger}}
-		}
-	}
 	return &LoggerMiddleware{
 		name:         config.Name,
-		logger:       httpLogger,
+		logger:       createHTTPLogger(ctx, config),
 		contentTypes: config.BodyContentTypes,
 		next:         next,
 	}, nil
+}
+
+func createHTTPLogger(ctx context.Context, config *Config) HTTPLogger {
+	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+	switch config.LogFormat {
+	case JSONFormat:
+		return createJsonHTTPLogger(ctx, logger)
+	default:
+		return createTextualHTTPLogger(ctx, logger)
+	}
 }
 
 func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {

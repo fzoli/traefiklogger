@@ -2,6 +2,7 @@
 package traefiklogger
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
@@ -23,6 +24,15 @@ type SystemLoggerClock struct{}
 // Now returns current OS system time.
 func (*SystemLoggerClock) Now() time.Time {
 	return time.Now()
+}
+
+func createLoggerClock(ctx context.Context) LoggerClock {
+	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
+	if hasExternalClock {
+		return externalClock
+	} else {
+		return &SystemLoggerClock{}
+	}
 }
 
 type logWriterContextKey string
@@ -53,4 +63,23 @@ type LoggerLogWriter struct {
 func (w *LoggerLogWriter) Write(log string) error {
 	w.logger.Print(log)
 	return nil
+}
+
+func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) HTTPLogger {
+	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
+	if hasExternalLogWriter {
+		return &TextualHTTPLogger{logger: logger, writer: externalLogWriter}
+	} else {
+		return &TextualHTTPLogger{logger: logger, writer: &LoggerLogWriter{logger: logger}}
+	}
+}
+
+func createJsonHTTPLogger(ctx context.Context, logger *log.Logger) HTTPLogger {
+	clock := createLoggerClock(ctx)
+	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
+	if hasExternalLogWriter {
+		return &JSONHTTPLogger{clock: clock, logger: logger, writer: externalLogWriter}
+	} else {
+		return &JSONHTTPLogger{clock: clock, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
+	}
 }
