@@ -89,27 +89,11 @@ func createHTTPLogger(ctx context.Context, config *Config) HTTPLogger {
 }
 
 func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	requestWithBody := len(m.contentTypes) == 0
-	for _, contentType := range m.contentTypes {
-		if strings.Contains(r.Header.Get("Content-Type"), contentType) {
-			requestWithBody = true
-			break
-		}
-	}
-
-	responseWithBody := len(m.contentTypes) == 0
-	for _, contentType := range m.contentTypes {
-		if strings.Contains(r.Header.Get("Accept"), contentType) {
-			responseWithBody = true
-			break
-		}
-	}
-
 	requestBody := &bytes.Buffer{}
 	mrc := &multiReadCloser{
 		rc:       r.Body,
 		buf:      requestBody,
-		withBody: requestWithBody,
+		withBody: needToLogRequestBody(m, r),
 	}
 	r.Body = mrc
 
@@ -117,22 +101,42 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
-		withBody:       responseWithBody,
+		withBody:       needToLogResponseBody(m, r),
 	}
 
-	requestHeaders := ""
-	for key, values := range r.Header {
-		requestHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
-	}
+	requestHeaders := collectHeaders(r.Header)
 
 	m.next.ServeHTTP(mrw, r)
 
-	responseHeaders := ""
-	for key, values := range w.Header() {
-		responseHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
-	}
+	responseHeaders := collectHeaders(w.Header())
 
 	m.logger.print(m.name, r, mrw, requestHeaders, requestBody, responseHeaders)
+}
+
+func collectHeaders(header http.Header) string {
+	headers := ""
+	for key, values := range header {
+		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+	}
+	return headers
+}
+
+func needToLogRequestBody(m *LoggerMiddleware, r *http.Request) bool {
+	for _, contentType := range m.contentTypes {
+		if strings.Contains(r.Header.Get("Content-Type"), contentType) {
+			return true
+		}
+	}
+	return len(m.contentTypes) == 0
+}
+
+func needToLogResponseBody(m *LoggerMiddleware, r *http.Request) bool {
+	for _, contentType := range m.contentTypes {
+		if strings.Contains(r.Header.Get("Accept"), contentType) {
+			return true
+		}
+	}
+	return len(m.contentTypes) == 0
 }
 
 type multiResponseWriter struct {

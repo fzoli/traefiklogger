@@ -27,6 +27,7 @@ type TestLogWriter struct {
 }
 
 func (w *TestLogWriter) Write(log string) error {
+	w.t.Helper()
 	if log != w.expected {
 		w.t.Errorf("Expected: '%s', got: '%s'", w.expected, log)
 	}
