@@ -14,10 +14,21 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled          bool     `json:"enabled"`
-	Name             string   `json:"name,omitempty"`
-	BodyContentTypes []string `json:"bodyContentTypes,omitempty"`
+	Enabled          bool      `json:"enabled"`
+	LogFormat        LogFormat `json:"logFormat"`
+	Name             string    `json:"name,omitempty"`
+	BodyContentTypes []string  `json:"bodyContentTypes,omitempty"`
 }
+
+// LogFormat specifies the log format.
+type LogFormat string
+
+const (
+	// TextFormat indicates text log format.
+	TextFormat LogFormat = "text"
+	// JSONFormat indicates JSON log format.
+	JSONFormat LogFormat = "json"
+)
 
 // NoOpMiddleware a no-op plugin implementation.
 type NoOpMiddleware struct {
@@ -28,9 +39,16 @@ func (m *NoOpMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.next.ServeHTTP(w, r)
 }
 
+// HTTPLogger a logger strategy interface.
+type HTTPLogger interface {
+	// print Prints the HTTP log.
+	print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string)
+}
+
 // LoggerMiddleware a Logger plugin.
 type LoggerMiddleware struct {
-	logger       *log.Logger
+	name         string
+	logger       HTTPLogger
 	contentTypes []string
 	next         http.Handler
 }
@@ -39,6 +57,7 @@ type LoggerMiddleware struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:          true,
+		LogFormat:        TextFormat,
 		Name:             "HTTP",
 		BodyContentTypes: []string{},
 	}
@@ -52,8 +71,16 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		}, nil
 	}
 	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+	var httpLogger HTTPLogger
+	switch config.LogFormat {
+	case JSONFormat:
+		httpLogger = &JSONHTTPLogger{logger: logger}
+	default:
+		httpLogger = &TextualHTTPLogger{logger: logger}
+	}
 	return &LoggerMiddleware{
-		logger:       logger,
+		name:         config.Name,
+		logger:       httpLogger,
 		contentTypes: config.BodyContentTypes,
 		next:         next,
 	}, nil
@@ -103,7 +130,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		responseHeaders += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
 	}
 
-	m.logger.Print(createLog(r, mrw, requestHeaders, requestBody, responseHeaders))
+	m.logger.print(m.name, r, mrw, requestHeaders, requestBody, responseHeaders)
 }
 
 type multiResponseWriter struct {
@@ -144,31 +171,4 @@ func (mrc *multiReadCloser) Read(p []byte) (int, error) {
 
 func (mrc *multiReadCloser) Close() error {
 	return mrc.rc.Close()
-}
-
-func createLog(r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string) string {
-	logMessage := fmt.Sprintf("%s %s %s: %d %s %s\n",
-		r.RemoteAddr, r.Method, r.URL.String(),
-		mrw.status, http.StatusText(mrw.status), r.Proto,
-	)
-
-	if len(requestHeaders) > 0 {
-		logMessage += "\nRequest Headers:\n" + requestHeaders
-	}
-
-	if requestBody.Len() > 0 {
-		logMessage += "\nRequest Body:\n" + requestBody.String() + "\n"
-	}
-
-	if len(responseHeaders) > 0 {
-		logMessage += "\nResponse Headers:\n" + responseHeaders
-	}
-
-	logMessage += fmt.Sprintf("\nResponse Content Length: %d\n", mrw.length)
-
-	if mrw.body.Len() > 0 {
-		logMessage += "\nResponse Body:\n" + mrw.body.String() + "\n"
-	}
-
-	return logMessage + "\n"
 }
