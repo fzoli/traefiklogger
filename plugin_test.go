@@ -10,128 +10,168 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fzoli/traefiklogger"
 )
 
+type TestLoggerClock struct{}
+
+func (c *TestLoggerClock) Now() time.Time {
+	return time.Date(2020, time.December, 15, 13, 30, 40, 999999999, time.UTC)
+}
+
+type TestLogWriter struct {
+	t        *testing.T
+	expected string
+}
+
+func (w *TestLogWriter) Write(log string) error {
+	if log != w.expected {
+		w.t.Errorf("Expected: '%s', got: '%s'", w.expected, log)
+	}
+	return nil
+}
+
+func createContext(t *testing.T, expectedLog string) context.Context {
+	t.Helper()
+	return context.WithValue(context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: expectedLog}), traefiklogger.ClockContextKey, &TestLoggerClock{})
+}
+
 func TestPost(t *testing.T) {
-	cfg := traefiklogger.CreateConfig()
+	expectedLogs := map[traefiklogger.LogFormat]string{
+		traefiklogger.TextFormat: "127.0.0.1 POST http://localhost/post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\n\nRequest Body:\n5\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\nResponse Body:\n10\n\n",
+		traefiklogger.JSONFormat: "{\"system\":\"HTTP\",\"time\":\"2020-12-15T13:30:40.999Z\",\"remoteAddr\":\"127.0.0.1\",\"method\":\"POST\",\"url\":\"http://localhost/post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":\"text/plain\"},\"requestBody\":\"5\",\"responseHeaders\":{\"Content-Type\":\"text/plain\"},\"responseContentLength\":2,\"responseBody\":\"10\"}\n",
+	}
 
-	ctx := context.Background()
-	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		// Read the request body
-		body, err := io.ReadAll(req.Body)
-		if err != nil {
-			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		defer func(Body io.ReadCloser) {
-			cerr := Body.Close()
-			if cerr != nil {
-				log.Printf("Failed to close reader: %v", cerr)
+	for logFormat, expectedLog := range expectedLogs {
+		cfg := traefiklogger.CreateConfig()
+		cfg.LogFormat = logFormat
+
+		ctx := createContext(t, expectedLog)
+
+		next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			// Read the request body
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+				return
 			}
-		}(req.Body)
+			defer func(Body io.ReadCloser) {
+				cerr := Body.Close()
+				if cerr != nil {
+					log.Printf("Failed to close reader: %v", cerr)
+				}
+			}(req.Body)
 
-		// Parse the request body as an integer
-		num, err := strconv.Atoi(string(body))
+			// Parse the request body as an integer
+			num, err := strconv.Atoi(string(body))
+			if err != nil {
+				http.Error(rw, "Bad Request: Request body must be an integer", http.StatusBadRequest)
+				return
+			}
+
+			// Double the number
+			result := num * 2
+
+			// Write the result as the response body
+			rw.WriteHeader(http.StatusOK)
+			rw.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(rw, "%d", result)
+		})
+
+		handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
 		if err != nil {
-			http.Error(rw, "Bad Request: Request body must be an integer", http.StatusBadRequest)
-			return
+			t.Fatal(err)
 		}
 
-		// Double the number
-		result := num * 2
+		recorder := httptest.NewRecorder()
 
-		// Write the result as the response body
-		rw.WriteHeader(http.StatusOK)
-		rw.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(rw, "%d", result)
-	})
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/post", strings.NewReader("5"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.RemoteAddr = "127.0.0.1"
+		req.Header.Set("Accept", "text/plain")
 
-	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
-	if err != nil {
-		t.Fatal(err)
-	}
+		handler.ServeHTTP(recorder, req)
 
-	recorder := httptest.NewRecorder()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/post", strings.NewReader("5"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Accept", "text/plain")
-
-	handler.ServeHTTP(recorder, req)
-
-	// Check the response body
-	if recorder.Body.String() != "10" {
-		t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+		// Check the response body
+		if recorder.Body.String() != "10" {
+			t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+		}
 	}
 }
 
 func TestShortPost(t *testing.T) {
-	cfg := &traefiklogger.Config{
-		Enabled:          true,
-		Name:             "HTTP",
-		BodyContentTypes: []string{"text/html"},
+	expectedLogs := map[traefiklogger.LogFormat]string{
+		traefiklogger.TextFormat: "127.0.0.1 POST http://localhost/post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\n",
+		traefiklogger.JSONFormat: "{\"system\":\"HTTP\",\"time\":\"2020-12-15T13:30:40.999Z\",\"remoteAddr\":\"127.0.0.1\",\"method\":\"POST\",\"url\":\"http://localhost/post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":\"text/plain\"},\"responseHeaders\":{\"Content-Type\":\"text/plain\"},\"responseContentLength\":2}\n",
 	}
 
-	ctx := context.Background()
-	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		// Read the request body
-		body, err := io.ReadAll(req.Body)
-		if err != nil {
-			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		defer func(Body io.ReadCloser) {
-			cerr := Body.Close()
-			if cerr != nil {
-				log.Printf("Failed to close reader: %v", cerr)
+	for logFormat, expectedLog := range expectedLogs {
+		cfg := traefiklogger.CreateConfig()
+		cfg.LogFormat = logFormat
+		cfg.BodyContentTypes = []string{"text/html"}
+
+		ctx := createContext(t, expectedLog)
+		next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			// Read the request body
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+				return
 			}
-		}(req.Body)
+			defer func(Body io.ReadCloser) {
+				cerr := Body.Close()
+				if cerr != nil {
+					log.Printf("Failed to close reader: %v", cerr)
+				}
+			}(req.Body)
 
-		// Parse the request body as an integer
-		num, err := strconv.Atoi(string(body))
+			// Parse the request body as an integer
+			num, err := strconv.Atoi(string(body))
+			if err != nil {
+				http.Error(rw, "Bad Request: Request body must be an integer", http.StatusBadRequest)
+				return
+			}
+
+			// Double the number
+			result := num * 2
+
+			// Write the result as the response body
+			rw.WriteHeader(http.StatusOK)
+			rw.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(rw, "%d", result)
+		})
+
+		handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
 		if err != nil {
-			http.Error(rw, "Bad Request: Request body must be an integer", http.StatusBadRequest)
-			return
+			t.Fatal(err)
 		}
 
-		// Double the number
-		result := num * 2
+		recorder := httptest.NewRecorder()
 
-		// Write the result as the response body
-		rw.WriteHeader(http.StatusOK)
-		rw.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(rw, "%d", result)
-	})
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/post", strings.NewReader("5"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.RemoteAddr = "127.0.0.1"
+		req.Header.Set("Accept", "text/plain")
 
-	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
-	if err != nil {
-		t.Fatal(err)
-	}
+		handler.ServeHTTP(recorder, req)
 
-	recorder := httptest.NewRecorder()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/post", strings.NewReader("5"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Accept", "text/plain")
-
-	handler.ServeHTTP(recorder, req)
-
-	// Check the response body
-	if recorder.Body.String() != "10" {
-		t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+		// Check the response body
+		if recorder.Body.String() != "10" {
+			t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+		}
 	}
 }
 
 func TestEmptyPost(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 POST http://localhost/empty-post: 200 OK HTTP/1.1\n\nRequest Body:\n5\n\nResponse Content Length: 0\n\n"})
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// Read the request body (to appear in logs)
 		_, err := io.ReadAll(req.Body)
@@ -159,6 +199,7 @@ func TestEmptyPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.RemoteAddr = "127.0.0.1"
 
 	handler.ServeHTTP(recorder, req)
 
@@ -171,7 +212,7 @@ func TestEmptyPost(t *testing.T) {
 func TestGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET http://localhost/get: 200 OK HTTP/1.1\n\nResponse Content Length: 1\n\nResponse Body:\n5\n\n"})
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// Write the result as the response body
 		rw.WriteHeader(http.StatusOK)
@@ -189,6 +230,7 @@ func TestGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.RemoteAddr = "127.0.0.1"
 
 	handler.ServeHTTP(recorder, req)
 
@@ -201,7 +243,7 @@ func TestGet(t *testing.T) {
 func TestEmptyGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET http://localhost/empty-get: 200 OK HTTP/1.1\n\nResponse Content Length: 0\n\n"})
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 	})
@@ -217,6 +259,7 @@ func TestEmptyGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.RemoteAddr = "127.0.0.1"
 
 	handler.ServeHTTP(recorder, req)
 
@@ -227,11 +270,10 @@ func TestEmptyGet(t *testing.T) {
 }
 
 func TestDisabled(t *testing.T) {
-	cfg := &traefiklogger.Config{
-		Enabled: false,
-	}
+	cfg := traefiklogger.CreateConfig()
+	cfg.Enabled = false
 
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: ""})
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 		fmt.Fprintf(rw, "%d", 5)
@@ -248,6 +290,7 @@ func TestDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.RemoteAddr = "127.0.0.1"
 
 	handler.ServeHTTP(recorder, req)
 

@@ -11,6 +11,7 @@ import (
 // TextualHTTPLogger a textual logger implementation.
 type TextualHTTPLogger struct {
 	logger *log.Logger
+	writer LogWriter
 }
 
 func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string) {
@@ -37,5 +38,9 @@ func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiRe
 		logMessage += "\nResponse Body:\n" + mrw.body.String() + "\n"
 	}
 
-	thl.logger.Print(logMessage + "\n")
+	err := thl.writer.Write(logMessage + "\n")
+	if err != nil {
+		thl.logger.Println("Failed to write:", err)
+		return
+	}
 }

@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 )
 
 // JSONHTTPLogger a JSON logger implementation.
 type JSONHTTPLogger struct {
+	clock  LoggerClock
 	logger *log.Logger
+	writer LogWriter
 }
 
 func (jhl *JSONHTTPLogger) print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string) {
@@ -33,7 +33,7 @@ func (jhl *JSONHTTPLogger) print(system string, r *http.Request, mrw *multiRespo
 		ResponseBody       string            `json:"responseBody,omitempty"`
 	}{
 		System:             system,
-		Time:               time.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00"),
+		Time:               jhl.clock.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00"),
 		RemoteAddr:         r.RemoteAddr,
 		Method:             r.Method,
 		URL:                r.URL.String(),
@@ -53,9 +53,9 @@ func (jhl *JSONHTTPLogger) print(system string, r *http.Request, mrw *multiRespo
 		return
 	}
 
-	_, err = os.Stdout.WriteString(string(logBytes) + "\n")
+	err = jhl.writer.Write(string(logBytes) + "\n")
 	if err != nil {
-		jhl.logger.Println("Failed to print")
+		jhl.logger.Println("Failed to write:", err)
 		return
 	}
 }
