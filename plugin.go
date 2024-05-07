@@ -14,8 +14,9 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled bool   `json:"enabled"`
-	Name    string `json:"name,omitempty"`
+	Enabled          bool     `json:"enabled"`
+	Name             string   `json:"name,omitempty"`
+	BodyContentTypes []string `json:"bodyContentTypes,omitempty"`
 }
 
 // NoOpMiddleware a no-op plugin implementation.
@@ -29,15 +30,17 @@ func (m *NoOpMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // LoggerMiddleware a Logger plugin.
 type LoggerMiddleware struct {
-	logger *log.Logger
-	next   http.Handler
+	logger       *log.Logger
+	contentTypes []string
+	next         http.Handler
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		Enabled: true,
-		Name:    "HTTP",
+		Enabled:          true,
+		Name:             "HTTP",
+		BodyContentTypes: []string{},
 	}
 }
 
@@ -50,17 +53,34 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
 	return &LoggerMiddleware{
-		logger: logger,
-		next:   next,
+		logger:       logger,
+		contentTypes: config.BodyContentTypes,
+		next:         next,
 	}, nil
 }
 
 func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	requestBody := &bytes.Buffer{}
+	requestWithBody := len(m.contentTypes) == 0
+	for _, contentType := range m.contentTypes {
+		if strings.Contains(r.Header.Get("Content-Type"), contentType) {
+			requestWithBody = true
+			break
+		}
+	}
 
+	responseWithBody := len(m.contentTypes) == 0
+	for _, contentType := range m.contentTypes {
+		if strings.Contains(r.Header.Get("Accept"), contentType) {
+			responseWithBody = true
+			break
+		}
+	}
+
+	requestBody := &bytes.Buffer{}
 	mrc := &multiReadCloser{
-		rc:  r.Body,
-		buf: requestBody,
+		rc:       r.Body,
+		buf:      requestBody,
+		withBody: requestWithBody,
 	}
 	r.Body = mrc
 
@@ -68,6 +88,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
+		withBody:       responseWithBody,
 	}
 
 	requestHeaders := ""
@@ -87,9 +108,10 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type multiResponseWriter struct {
 	http.ResponseWriter
-	status int
-	length int
-	body   *bytes.Buffer
+	status   int
+	length   int
+	body     *bytes.Buffer
+	withBody bool
 }
 
 func (w *multiResponseWriter) WriteHeader(status int) {
@@ -100,18 +122,21 @@ func (w *multiResponseWriter) WriteHeader(status int) {
 func (w *multiResponseWriter) Write(b []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(b)
 	w.length += n
-	w.body.Write(b)
+	if w.withBody {
+		w.body.Write(b)
+	}
 	return n, err
 }
 
 type multiReadCloser struct {
-	rc  io.ReadCloser
-	buf *bytes.Buffer
+	rc       io.ReadCloser
+	buf      *bytes.Buffer
+	withBody bool
 }
 
 func (mrc *multiReadCloser) Read(p []byte) (int, error) {
 	n, err := mrc.rc.Read(p)
-	if n > 0 {
+	if mrc.withBody && n > 0 {
 		mrc.buf.Write(p[:n])
 	}
 	return n, err

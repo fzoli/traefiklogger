@@ -69,6 +69,65 @@ func TestPost(t *testing.T) {
 	}
 }
 
+func TestShortPost(t *testing.T) {
+	cfg := &traefiklogger.Config{
+		Enabled:          true,
+		Name:             "HTTP",
+		BodyContentTypes: []string{"text/html"},
+	}
+
+	ctx := context.Background()
+	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Read the request body
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		defer func(Body io.ReadCloser) {
+			cerr := Body.Close()
+			if cerr != nil {
+				log.Printf("Failed to close reader: %v", cerr)
+			}
+		}(req.Body)
+
+		// Parse the request body as an integer
+		num, err := strconv.Atoi(string(body))
+		if err != nil {
+			http.Error(rw, "Bad Request: Request body must be an integer", http.StatusBadRequest)
+			return
+		}
+
+		// Double the number
+		result := num * 2
+
+		// Write the result as the response body
+		rw.WriteHeader(http.StatusOK)
+		rw.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(rw, "%d", result)
+	})
+
+	handler, err := traefiklogger.New(ctx, next, cfg, "logger-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/post", strings.NewReader("5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Accept", "text/plain")
+
+	handler.ServeHTTP(recorder, req)
+
+	// Check the response body
+	if recorder.Body.String() != "10" {
+		t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+	}
+}
+
 func TestEmptyPost(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
