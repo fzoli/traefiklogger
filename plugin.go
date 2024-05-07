@@ -70,22 +70,22 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 			next: next,
 		}, nil
 	}
+
+	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+	var httpLogger HTTPLogger
+	switch config.LogFormat {
+	case JSONFormat:
+		httpLogger = createJSONHTTPLogger(ctx, logger)
+	default:
+		httpLogger = createTextualHTTPLogger(ctx, logger)
+	}
+
 	return &LoggerMiddleware{
 		name:         config.Name,
-		logger:       createHTTPLogger(ctx, config),
+		logger:       httpLogger,
 		contentTypes: config.BodyContentTypes,
 		next:         next,
 	}, nil
-}
-
-func createHTTPLogger(ctx context.Context, config *Config) HTTPLogger {
-	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
-	switch config.LogFormat {
-	case JSONFormat:
-		return createJsonHTTPLogger(ctx, logger)
-	default:
-		return createTextualHTTPLogger(ctx, logger)
-	}
 }
 
 func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -113,14 +113,6 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.logger.print(m.name, r, mrw, requestHeaders, requestBody, responseHeaders)
 }
 
-func collectHeaders(header http.Header) string {
-	headers := ""
-	for key, values := range header {
-		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
-	}
-	return headers
-}
-
 func needToLogRequestBody(m *LoggerMiddleware, r *http.Request) bool {
 	for _, contentType := range m.contentTypes {
 		if strings.Contains(r.Header.Get("Content-Type"), contentType) {
@@ -137,6 +129,14 @@ func needToLogResponseBody(m *LoggerMiddleware, r *http.Request) bool {
 		}
 	}
 	return len(m.contentTypes) == 0
+}
+
+func collectHeaders(header http.Header) string {
+	headers := ""
+	for key, values := range header {
+		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+	}
+	return headers
 }
 
 type multiResponseWriter struct {

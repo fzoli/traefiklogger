@@ -26,15 +26,6 @@ func (*SystemLoggerClock) Now() time.Time {
 	return time.Now()
 }
 
-func createLoggerClock(ctx context.Context) LoggerClock {
-	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
-	if hasExternalClock {
-		return externalClock
-	} else {
-		return &SystemLoggerClock{}
-	}
-}
-
 type logWriterContextKey string
 
 // LogWriterContextKey can be used to spy log writes.
@@ -65,21 +56,25 @@ func (w *LoggerLogWriter) Write(log string) error {
 	return nil
 }
 
-func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) HTTPLogger {
+func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) *TextualHTTPLogger {
 	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
 	if hasExternalLogWriter {
 		return &TextualHTTPLogger{logger: logger, writer: externalLogWriter}
-	} else {
-		return &TextualHTTPLogger{logger: logger, writer: &LoggerLogWriter{logger: logger}}
 	}
+	return &TextualHTTPLogger{logger: logger, writer: &LoggerLogWriter{logger: logger}}
 }
 
-func createJsonHTTPLogger(ctx context.Context, logger *log.Logger) HTTPLogger {
-	clock := createLoggerClock(ctx)
+func createJSONHTTPLogger(ctx context.Context, logger *log.Logger) *JSONHTTPLogger {
+	var clock LoggerClock
+	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
+	if hasExternalClock {
+		clock = externalClock
+	} else {
+		clock = &SystemLoggerClock{}
+	}
 	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
 	if hasExternalLogWriter {
 		return &JSONHTTPLogger{clock: clock, logger: logger, writer: externalLogWriter}
-	} else {
-		return &JSONHTTPLogger{clock: clock, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
 	}
+	return &JSONHTTPLogger{clock: clock, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
 }
