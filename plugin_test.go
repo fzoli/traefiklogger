@@ -89,6 +89,11 @@ func blackHole(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+// alwaysError just returns HTTP 500
+func alwaysError(rw http.ResponseWriter, req *http.Request) {
+	http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+}
+
 // alwaysFive does not read the request, just returns HTTP OK with response body 5.
 func alwaysFive(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
@@ -215,6 +220,32 @@ func TestGet(t *testing.T) {
 	// Check the response body
 	if recorder.Body.String() != "5" {
 		t.Errorf("Expected response body: '5', got: '%s'", recorder.Body.String())
+	}
+}
+
+func TestGetError(t *testing.T) {
+	cfg := traefiklogger.CreateConfig()
+
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET http://localhost/get: 500 Internal Server Error HTTP/1.1\n\nResponse Headers:\nContent-Type: text/plain; charset=utf-8\nX-Content-Type-Options: nosniff\n\nResponse Content Length: 22\n\nResponse Body:\nInternal Server Error\n\n\n"})
+
+	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysError), cfg, "logger-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/get", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.RemoteAddr = "127.0.0.1"
+
+	handler.ServeHTTP(recorder, req)
+
+	// Check the response body
+	if recorder.Body.String() != "Internal Server Error\n" {
+		t.Errorf("Expected response body: 'Internal Server Error\n', got: '%s'", recorder.Body.String())
 	}
 }
 
