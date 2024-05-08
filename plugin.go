@@ -4,8 +4,9 @@ package traefiklogger
 import (
 	"bytes"
 	"context"
+	"go.elastic.co/ecszap"
+	"go.uber.org/zap"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -85,7 +86,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		}, nil
 	}
 
-	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+	logger := zap.New(ecszap.NewCore(ecszap.NewDefaultEncoderConfig(), os.Stdout, zap.DebugLevel), zap.AddCaller()).With(zap.String("app", config.Name))
 	var httpLogger HTTPLogger
 	switch config.LogFormat {
 	case JSONFormat:

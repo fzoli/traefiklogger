@@ -3,14 +3,14 @@ package traefiklogger
 
 import (
 	"encoding/json"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
 )
 
 // JSONHTTPLogger a JSON logger implementation.
 type JSONHTTPLogger struct {
 	clock  LoggerClock
-	logger *log.Logger
+	logger *zap.Logger
 	writer LogWriter
 }
 
@@ -47,13 +47,13 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 
 	logBytes, err := json.Marshal(logData)
 	if err != nil {
-		jhl.logger.Println("Failed to marshal json log data")
+		jhl.logger.Error("Failed to marshal json log data", zap.Error(err))
 		return
 	}
 
 	err = jhl.writer.Write(string(logBytes) + "\n")
 	if err != nil {
-		jhl.logger.Println("Failed to write:", err)
+		jhl.logger.Error("Failed to write", zap.Error(err))
 		return
 	}
 }

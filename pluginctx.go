@@ -3,7 +3,7 @@ package traefiklogger
 
 import (
 	"context"
-	"log"
+	"go.uber.org/zap"
 	"os"
 	"time"
 )
@@ -48,15 +48,15 @@ func (w *FileLogWriter) Write(log string) error {
 
 // LoggerLogWriter writes logs to a Logger.
 type LoggerLogWriter struct {
-	logger *log.Logger
+	logger *zap.Logger
 }
 
 func (w *LoggerLogWriter) Write(log string) error {
-	w.logger.Print(log)
+	w.logger.Info(log)
 	return nil
 }
 
-func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) *TextualHTTPLogger {
+func createTextualHTTPLogger(ctx context.Context, logger *zap.Logger) *TextualHTTPLogger {
 	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
 	if hasExternalLogWriter {
 		return &TextualHTTPLogger{logger: logger, writer: externalLogWriter}
@@ -64,7 +64,7 @@ func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) *TextualHT
 	return &TextualHTTPLogger{logger: logger, writer: &LoggerLogWriter{logger: logger}}
 }
 
-func createJSONHTTPLogger(ctx context.Context, logger *log.Logger) *JSONHTTPLogger {
+func createJSONHTTPLogger(ctx context.Context, logger *zap.Logger) *JSONHTTPLogger {
 	var clock LoggerClock
 	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
 	if hasExternalClock {

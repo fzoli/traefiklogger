@@ -3,14 +3,14 @@ package traefiklogger
 
 import (
 	"fmt"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
 	"strings"
 )
 
 // TextualHTTPLogger a textual logger implementation.
 type TextualHTTPLogger struct {
-	logger *log.Logger
+	logger *zap.Logger
 	writer LogWriter
 }
 
@@ -40,7 +40,7 @@ func (thl *TextualHTTPLogger) print(record *LogRecord) {
 
 	err := thl.writer.Write(logMessage + "\n")
 	if err != nil {
-		thl.logger.Println("Failed to write:", err)
+		thl.logger.Error("Failed to write", zap.Error(err))
 		return
 	}
 }
