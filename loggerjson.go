@@ -2,7 +2,6 @@
 package traefiklogger
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -15,35 +14,35 @@ type JSONHTTPLogger struct {
 	writer LogWriter
 }
 
-func (jhl *JSONHTTPLogger) print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders http.Header, requestBody *bytes.Buffer, responseHeaders http.Header) {
+func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 	logData := struct {
-		System             string              `json:"system,omitempty"`
-		Time               string              `json:"time"`
-		RemoteAddr         string              `json:"remoteAddr,omitempty"`
-		Method             string              `json:"method"`
-		URL                string              `json:"url"`
-		Status             int                 `json:"status"`
-		StatusText         string              `json:"statusText"`
-		Proto              string              `json:"proto"`
-		RequestHeaders     map[string][]string `json:"requestHeaders,omitempty"`
-		RequestBody        string              `json:"requestBody,omitempty"`
-		ResponseHeaders    map[string][]string `json:"responseHeaders,omitempty"`
-		ResponseContentLen int                 `json:"responseContentLength"`
-		ResponseBody       string              `json:"responseBody,omitempty"`
+		System                string              `json:"system,omitempty"`
+		Time                  string              `json:"time"`
+		RemoteAddr            string              `json:"remoteAddr,omitempty"`
+		Method                string              `json:"method"`
+		URL                   string              `json:"url"`
+		Status                int                 `json:"status"`
+		StatusText            string              `json:"statusText"`
+		Proto                 string              `json:"proto"`
+		RequestHeaders        map[string][]string `json:"requestHeaders,omitempty"`
+		RequestBody           string              `json:"requestBody,omitempty"`
+		ResponseHeaders       map[string][]string `json:"responseHeaders,omitempty"`
+		ResponseContentLength int                 `json:"responseContentLength"`
+		ResponseBody          string              `json:"responseBody,omitempty"`
 	}{
-		System:             system,
-		Time:               jhl.clock.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00"),
-		RemoteAddr:         r.RemoteAddr,
-		Method:             r.Method,
-		URL:                r.URL.String(),
-		Status:             mrw.status,
-		StatusText:         http.StatusText(mrw.status),
-		Proto:              r.Proto,
-		RequestHeaders:     requestHeaders,
-		RequestBody:        requestBody.String(),
-		ResponseHeaders:    responseHeaders,
-		ResponseContentLen: mrw.length,
-		ResponseBody:       mrw.body.String(),
+		System:                record.System,
+		Time:                  jhl.clock.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00"),
+		RemoteAddr:            record.RemoteAddr,
+		Method:                record.Method,
+		URL:                   record.URL,
+		Status:                record.StatusCode,
+		StatusText:            http.StatusText(record.StatusCode),
+		Proto:                 record.Proto,
+		RequestHeaders:        record.RequestHeaders,
+		RequestBody:           record.RequestBody.String(),
+		ResponseHeaders:       record.ResponseHeaders,
+		ResponseContentLength: record.ResponseContentLength,
+		ResponseBody:          record.ResponseBody.String(),
 	}
 
 	logBytes, err := json.Marshal(logData)

@@ -2,7 +2,6 @@
 package traefiklogger
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,28 +14,28 @@ type TextualHTTPLogger struct {
 	writer LogWriter
 }
 
-func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders http.Header, requestBody *bytes.Buffer, responseHeaders http.Header) {
+func (thl *TextualHTTPLogger) print(record *LogRecord) {
 	logMessage := fmt.Sprintf("%s %s %s: %d %s %s\n",
-		r.RemoteAddr, r.Method, r.URL.String(),
-		mrw.status, http.StatusText(mrw.status), r.Proto,
+		record.RemoteAddr, record.Method, record.URL,
+		record.StatusCode, http.StatusText(record.StatusCode), record.Proto,
 	)
 
-	if len(requestHeaders) > 0 {
-		logMessage += "\nRequest Headers:\n" + formatHeaders(requestHeaders)
+	if len(record.RequestHeaders) > 0 {
+		logMessage += "\nRequest Headers:\n" + formatHeaders(record.RequestHeaders)
 	}
 
-	if requestBody.Len() > 0 {
-		logMessage += "\nRequest Body:\n" + requestBody.String() + "\n"
+	if record.RequestBody.Len() > 0 {
+		logMessage += "\nRequest Body:\n" + record.RequestBody.String() + "\n"
 	}
 
-	if len(responseHeaders) > 0 {
-		logMessage += "\nResponse Headers:\n" + formatHeaders(responseHeaders)
+	if len(record.ResponseHeaders) > 0 {
+		logMessage += "\nResponse Headers:\n" + formatHeaders(record.ResponseHeaders)
 	}
 
-	logMessage += fmt.Sprintf("\nResponse Content Length: %d\n", mrw.length)
+	logMessage += fmt.Sprintf("\nResponse Content Length: %d\n", record.ResponseContentLength)
 
-	if mrw.body.Len() > 0 {
-		logMessage += "\nResponse Body:\n" + mrw.body.String() + "\n"
+	if record.ResponseBody.Len() > 0 {
+		logMessage += "\nResponse Body:\n" + record.ResponseBody.String() + "\n"
 	}
 
 	err := thl.writer.Write(logMessage + "\n")

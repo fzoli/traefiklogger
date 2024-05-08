@@ -41,7 +41,22 @@ func (m *NoOpMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // HTTPLogger a logger strategy interface.
 type HTTPLogger interface {
 	// print Prints the HTTP log.
-	print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders http.Header, requestBody *bytes.Buffer, responseHeaders http.Header)
+	print(record *LogRecord)
+}
+
+// LogRecord contains the loggable data.
+type LogRecord struct {
+	System                string
+	Proto                 string
+	Method                string
+	URL                   string
+	RemoteAddr            string
+	StatusCode            int
+	RequestHeaders        http.Header
+	RequestBody           *bytes.Buffer
+	ResponseHeaders       http.Header
+	ResponseBody          *bytes.Buffer
+	ResponseContentLength int
 }
 
 // LoggerMiddleware a Logger plugin.
@@ -88,10 +103,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	requestBody := &bytes.Buffer{}
 	mrc := &multiReadCloser{
 		rc:       r.Body,
-		buf:      requestBody,
+		buf:      &bytes.Buffer{},
 		withBody: needToLogRequestBody(m, r),
 	}
 	r.Body = mrc
@@ -109,7 +123,21 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	responseHeaders := copyHeaders(w.Header())
 
-	m.logger.print(m.name, r, mrw, requestHeaders, requestBody, responseHeaders)
+	logRecord := &LogRecord{
+		System:                m.name,
+		Proto:                 r.Proto,
+		Method:                r.Method,
+		URL:                   r.URL.String(),
+		RemoteAddr:            r.RemoteAddr,
+		StatusCode:            mrw.status,
+		RequestHeaders:        requestHeaders,
+		RequestBody:           mrc.buf,
+		ResponseHeaders:       responseHeaders,
+		ResponseBody:          mrw.body,
+		ResponseContentLength: mrw.length,
+	}
+
+	m.logger.print(logRecord)
 }
 
 func needToLogRequestBody(m *LoggerMiddleware, r *http.Request) bool {
