@@ -106,7 +106,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mrc := &multiReadCloser{
 		rc:       r.Body,
 		buf:      &bytes.Buffer{},
-		withBody: needToLogRequestBody(m, r),
+		withBody: needToLogBody(m, r, "Content-Type"),
 	}
 	r.Body = mrc
 
@@ -114,7 +114,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
-		withBody:       needToLogResponseBody(m, r),
+		withBody:       needToLogBody(m, r, "Accept"),
 	}
 
 	requestHeaders := copyHeaders(r.Header)
@@ -140,18 +140,9 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.logger.print(logRecord)
 }
 
-func needToLogRequestBody(m *LoggerMiddleware, r *http.Request) bool {
+func needToLogBody(m *LoggerMiddleware, r *http.Request, header string) bool {
 	for _, contentType := range m.contentTypes {
-		if strings.Contains(r.Header.Get("Content-Type"), contentType) {
-			return true
-		}
-	}
-	return len(m.contentTypes) == 0
-}
-
-func needToLogResponseBody(m *LoggerMiddleware, r *http.Request) bool {
-	for _, contentType := range m.contentTypes {
-		if strings.Contains(r.Header.Get("Accept"), contentType) {
+		if strings.Contains(r.Header.Get(header), contentType) {
 			return true
 		}
 	}
