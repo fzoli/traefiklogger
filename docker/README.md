@@ -155,3 +155,20 @@ traefik-1  |
   "ecs.version":"1.6.0"
 }
 ```
+
+## Elasticsearch
+
+- Open Kibana from browser: http://localhost:5601/
+- Select Stream (under the Logs section)
+- Type into search: `"systemName":"nginx"`
+  (optional)
+- You can see the date-time, log level and the `message` field of each log entry.
+- On the detail panel you can find each attribute (like request/response body, headers).
+
+![Kibana](screenshot/kibana-log-details.png)
+
+## Traefik dashboard
+
+You can check the active middleware on the dasboard.
+
+![Kibana](screenshot/traefik-router.png)
