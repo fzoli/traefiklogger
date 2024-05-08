@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -46,9 +47,15 @@ func (thl *TextualHTTPLogger) print(record *LogRecord) {
 }
 
 func formatHeaders(header http.Header) string {
+	keys := make([]string, 0, len(header))
+	for key := range header {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
 	headers := ""
-	for key, values := range header {
-		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+	for _, key := range keys {
+		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(header[key], ","))
 	}
 	return headers
 }
