@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 // TextualHTTPLogger a textual logger implementation.
@@ -14,14 +15,14 @@ type TextualHTTPLogger struct {
 	writer LogWriter
 }
 
-func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string) {
+func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders http.Header, requestBody *bytes.Buffer, responseHeaders http.Header) {
 	logMessage := fmt.Sprintf("%s %s %s: %d %s %s\n",
 		r.RemoteAddr, r.Method, r.URL.String(),
 		mrw.status, http.StatusText(mrw.status), r.Proto,
 	)
 
 	if len(requestHeaders) > 0 {
-		logMessage += "\nRequest Headers:\n" + requestHeaders
+		logMessage += "\nRequest Headers:\n" + formatHeaders(requestHeaders)
 	}
 
 	if requestBody.Len() > 0 {
@@ -29,7 +30,7 @@ func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiRe
 	}
 
 	if len(responseHeaders) > 0 {
-		logMessage += "\nResponse Headers:\n" + responseHeaders
+		logMessage += "\nResponse Headers:\n" + formatHeaders(responseHeaders)
 	}
 
 	logMessage += fmt.Sprintf("\nResponse Content Length: %d\n", mrw.length)
@@ -43,4 +44,12 @@ func (thl *TextualHTTPLogger) print(system string, r *http.Request, mrw *multiRe
 		thl.logger.Println("Failed to write:", err)
 		return
 	}
+}
+
+func formatHeaders(header http.Header) string {
+	headers := ""
+	for key, values := range header {
+		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+	}
+	return headers
 }

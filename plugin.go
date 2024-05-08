@@ -4,7 +4,6 @@ package traefiklogger
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -42,7 +41,7 @@ func (m *NoOpMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // HTTPLogger a logger strategy interface.
 type HTTPLogger interface {
 	// print Prints the HTTP log.
-	print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders string, requestBody *bytes.Buffer, responseHeaders string)
+	print(system string, r *http.Request, mrw *multiResponseWriter, requestHeaders http.Header, requestBody *bytes.Buffer, responseHeaders http.Header)
 }
 
 // LoggerMiddleware a Logger plugin.
@@ -104,11 +103,11 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		withBody:       needToLogResponseBody(m, r),
 	}
 
-	requestHeaders := collectHeaders(r.Header)
+	requestHeaders := copyHeaders(r.Header)
 
 	m.next.ServeHTTP(mrw, r)
 
-	responseHeaders := collectHeaders(w.Header())
+	responseHeaders := copyHeaders(w.Header())
 
 	m.logger.print(m.name, r, mrw, requestHeaders, requestBody, responseHeaders)
 }
@@ -131,12 +130,12 @@ func needToLogResponseBody(m *LoggerMiddleware, r *http.Request) bool {
 	return len(m.contentTypes) == 0
 }
 
-func collectHeaders(header http.Header) string {
-	headers := ""
-	for key, values := range header {
-		headers += fmt.Sprintf("%s: %s\n", key, strings.Join(values, ","))
+func copyHeaders(original http.Header) http.Header {
+	newHeader := make(http.Header)
+	for key, value := range original {
+		newHeader[key] = value
 	}
-	return headers
+	return newHeader
 }
 
 type multiResponseWriter struct {
