@@ -5,6 +5,12 @@ services:
   traefik:
     image: traefik:3.0
     restart: always
+    #labels:
+    #  - "co.elastic.logs/enabled=true"
+    #  - "co.elastic.logs/json.keys_under_root=true"
+    #  - "co.elastic.logs/json.overwrite_keys=true"
+    #  - "co.elastic.logs/json.add_error_key=true"
+    #  - "co.elastic.logs/json.expand_keys=true"
     ports:
       - "127.0.0.1:8000:80"
       - "127.0.0.1:8001:8080"
@@ -25,6 +31,8 @@ services:
       - "traefik.http.services.nginx.loadbalancer.server.port=80"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Enabled=true"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Name=nginx"
+      - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=text"
+      #- "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=json"
       - "traefik.http.routers.nginx.middlewares=nginx-logger@docker"
     networks:
       - traefik
