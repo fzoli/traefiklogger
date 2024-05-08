@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 // JSONHTTPLogger a JSON logger implementation.
@@ -58,7 +59,11 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		return
 	}
 
-	err = jhl.writer.Write(string(logBytes) + "\n")
+	builder := strings.Builder{}
+	builder.Write(logBytes)
+	builder.WriteString("\n")
+
+	err = jhl.writer.Write(builder.String())
 	if err != nil {
 		jhl.logger.Println("Failed to write:", err)
 		return
