@@ -15,16 +15,10 @@ type JSONHTTPLogger struct {
 	writer LogWriter
 }
 
-type Origin struct {
-	FileName string `json:"file.name,omitempty"`
-	FileLine int    `json:"file.line,omitempty"`
-}
-
 func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 	logData := struct {
 		Level                 string              `json:"log.level,omitempty"`
 		Time                  string              `json:"@timestamp"`
-		Origin                Origin              `json:"log.origin"`
 		Message               string              `json:"message,omitempty"`
 		System                string              `json:"systemName,omitempty"`
 		RemoteAddr            string              `json:"remoteAddress,omitempty"`
@@ -42,7 +36,6 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 	}{
 		Level:                 "info",
 		Time:                  jhl.clock.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00"),
-		Origin:                Origin{FileName: "loggerjson.go", FileLine: 1},
 		Message:               fmt.Sprintf("%s %s %s %d", record.Method, record.URL, record.Proto, record.StatusCode),
 		System:                record.System,
 		RemoteAddr:            record.RemoteAddr,
