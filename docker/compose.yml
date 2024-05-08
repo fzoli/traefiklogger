@@ -16,11 +16,9 @@ services:
       - "127.0.0.1:8001:8080"
     networks:
       - traefik
-    #working_dir: "/" # only for plugin development
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.yaml:/traefik.yaml
-      #- ./plugins-local:/plugins-local # only for plugin development
 
   nginx:
     image: nginx:latest
@@ -31,8 +29,7 @@ services:
       - "traefik.http.services.nginx.loadbalancer.server.port=80"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Enabled=true"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Name=nginx"
-      #- "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=text"
-      - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=json"
+      - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=json" # remove this line to use text format
       - "traefik.http.routers.nginx.middlewares=nginx-logger@docker"
     networks:
       - traefik
@@ -54,6 +51,8 @@ services:
     environment:
       - discovery.type=single-node
     image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data
     healthcheck:
       test: [ "CMD", "curl", "-s", "-f", "http://localhost:9200/_cat/health" ]
       interval: 3s
@@ -80,3 +79,9 @@ services:
 networks:
   traefik:
   #external: true # on a real environment both service has separate compose file
+
+volumes:
+  elasticsearch: # use RAM if your disk has less than 5% free space
+    driver_opts:
+      type: tmpfs
+      device: tmpfs

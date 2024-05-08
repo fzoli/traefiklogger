@@ -10,9 +10,9 @@ import (
 
 // JSONHTTPLogger a JSON logger implementation.
 type JSONHTTPLogger struct {
-	clock   LoggerClock
-	logger  *log.Logger
-	writer  LogWriter
+	clock  LoggerClock
+	logger *log.Logger
+	writer LogWriter
 }
 
 type Origin struct {
@@ -26,10 +26,10 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		Time                  string              `json:"@timestamp"`
 		Origin                Origin              `json:"log.origin"`
 		Message               string              `json:"message,omitempty"`
-		System                string              `json:"system,omitempty"`
-		RemoteAddr            string              `json:"remoteAddr,omitempty"`
+		System                string              `json:"systemName,omitempty"`
+		RemoteAddr            string              `json:"remoteAddress,omitempty"`
 		Method                string              `json:"method"`
-		URL                   string              `json:"url"`
+		URL                   string              `json:"path"`
 		Status                int                 `json:"status"`
 		StatusText            string              `json:"statusText"`
 		Proto                 string              `json:"proto"`

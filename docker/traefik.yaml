@@ -11,10 +11,7 @@ providers:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
 experimental:
-#  localPlugins: # use this block instead for plugin development
-#    traefiklogger:
-#      moduleName: "github.com/fzoli/traefiklogger"
   plugins:
     traefiklogger:
       moduleName: "github.com/fzoli/traefiklogger"
-      version: "v0.7.5"
+      version: "v0.7.8"
