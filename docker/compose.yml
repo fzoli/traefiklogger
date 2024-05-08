@@ -10,9 +10,11 @@ services:
       - "127.0.0.1:8001:8080"
     networks:
       - traefik
+    working_dir: "/" # only for plugin development
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.yaml:/traefik.yaml
+      - /home/zoli/workspace/me/traefiklogger:/plugins-local/src/github.com/fzoli/traefiklogger # only for plugin development
 
   nginx:
     image: nginx:latest
