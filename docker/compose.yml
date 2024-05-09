@@ -30,6 +30,7 @@ services:
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Enabled=true"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Name=nginx"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=json" # remove this line to use text format
+      - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.GenerateLogID=true" # only for json
       - "traefik.http.routers.nginx.middlewares=nginx-logger@docker"
     networks:
       - traefik
