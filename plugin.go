@@ -103,6 +103,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 }
 
 func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Upgrade") == "websocket" {
+		m.next.ServeHTTP(w, r)
+		return
+	}
+
 	mrc := &multiReadCloser{
 		rc:       r.Body,
 		buf:      &bytes.Buffer{},

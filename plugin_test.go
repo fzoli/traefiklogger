@@ -37,7 +37,9 @@ func (w *TestLogWriter) Write(log string) error {
 // createContext creates text context with fake time and test log writer that assert the expected log.
 func createContext(t *testing.T, expectedLog string) context.Context {
 	t.Helper()
-	return context.WithValue(context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: expectedLog}), traefiklogger.ClockContextKey, &TestLoggerClock{})
+	clock := &TestLoggerClock{}
+	logWriter := &TestLogWriter{t: t, expected: expectedLog}
+	return context.WithValue(context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, logWriter), traefiklogger.ClockContextKey, clock)
 }
 
 // doubleTheNumber reads the request, parses it as integer then returns its double.
@@ -249,6 +251,34 @@ func TestGetError(t *testing.T) {
 	}
 }
 
+func TestGetWebsocket(t *testing.T) {
+	cfg := traefiklogger.CreateConfig()
+
+	lw := &TestLogWriter{t: t, expected: "LogWriter should not have been called"}
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, lw)
+
+	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "ws://localhost/ws", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.RemoteAddr = "127.0.0.1"
+	req.Header.Set("Upgrade", "websocket")
+
+	handler.ServeHTTP(recorder, req)
+
+	// Check the response body
+	if recorder.Body.String() != "5" {
+		t.Errorf("Expected response body: '5', got: '%s'", recorder.Body.String())
+	}
+}
+
 func TestEmptyGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
@@ -282,7 +312,8 @@ func TestDisabled(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 	cfg.Enabled = false
 
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: ""})
+	lw := &TestLogWriter{t: t, expected: "LogWriter should not have been called"}
+	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, lw)
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
 	if err != nil {
