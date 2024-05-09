@@ -41,7 +41,7 @@ type RandomUUIDGenerator struct{}
 
 // Generate generates secure random UUID.
 func (g *RandomUUIDGenerator) Generate() string {
-	return GenerateUUID4()
+	return Must(GenerateUUID4()).String()
 }
 
 // EmptyUUIDGenerator returns empty string.
