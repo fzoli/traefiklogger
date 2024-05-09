@@ -17,13 +17,13 @@ func GenerateUUID4() string {
 	bytes[6] = (bytes[6] & 0x0f) | 0x40 // Version 4
 	bytes[8] = (bytes[8] & 0x3f) | 0x80 // Variant is 10
 
-	uuid4 := hexEncodingStringConv(bytes)
+	uuid4 := hexEncodingStringConv(bytes[:])
 	return uuid4
 }
 
 // Hex encoding of bytes and conversion into string type with proper formatting.
 func hexEncodingStringConv(randomBits []byte) string {
-	builder := strings.Builder{}
+	var builder strings.Builder
 	builder.WriteString(hex.EncodeToString(randomBits[:4]))
 	builder.WriteString("-")
 	builder.WriteString(hex.EncodeToString(randomBits[4:6]))

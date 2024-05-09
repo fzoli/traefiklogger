@@ -62,7 +62,7 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		return
 	}
 
-	builder := strings.Builder{}
+	var builder strings.Builder
 	builder.Write(logBytes)
 	builder.WriteString("\n")
 
