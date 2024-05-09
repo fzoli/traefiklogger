@@ -73,6 +73,7 @@ func CreateConfig() *Config {
 	return &Config{
 		Enabled:          true,
 		LogFormat:        TextFormat,
+		GenerateLogID:    true,
 		Name:             "HTTP",
 		BodyContentTypes: []string{},
 	}
