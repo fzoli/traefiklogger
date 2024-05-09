@@ -11,9 +11,10 @@ import (
 
 // JSONHTTPLogger a JSON logger implementation.
 type JSONHTTPLogger struct {
-	clock  LoggerClock
-	logger *log.Logger
-	writer LogWriter
+	clock         LoggerClock
+	uuidGenerator UUIDGenerator
+	logger        *log.Logger
+	writer        LogWriter
 }
 
 func (jhl *JSONHTTPLogger) print(record *LogRecord) {
@@ -34,6 +35,7 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		ResponseContentLength int                 `json:"responseContentLength"`
 		ResponseBody          string              `json:"responseBody,omitempty"`
 		EcsVersion            string              `json:"ecs.version,omitempty"`
+		LogID                 string              `json:"logId,omitempty"`
 	}{
 		Level:                 "info",
 		Time:                  jhl.clock.Now().UTC().Format("2006-01-02T15:04:05.999Z07:00"),
@@ -51,6 +53,7 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		ResponseContentLength: record.ResponseContentLength,
 		ResponseBody:          record.ResponseBody.String(),
 		EcsVersion:            "1.6.0",
+		LogID:                 jhl.uuidGenerator.Generate(),
 	}
 
 	logBytes, err := json.Marshal(logData)

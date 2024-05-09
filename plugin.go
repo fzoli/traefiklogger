@@ -15,6 +15,7 @@ import (
 type Config struct {
 	Enabled          bool      `json:"enabled"`
 	LogFormat        LogFormat `json:"logFormat"`
+	GenerateLogID    bool      `json:"generateLogId,omitempty"`
 	Name             string    `json:"name,omitempty"`
 	BodyContentTypes []string  `json:"bodyContentTypes,omitempty"`
 }
@@ -89,7 +90,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	var httpLogger HTTPLogger
 	switch config.LogFormat {
 	case JSONFormat:
-		httpLogger = createJSONHTTPLogger(ctx, logger)
+		httpLogger = createJSONHTTPLogger(ctx, config, logger)
 	default:
 		httpLogger = createTextualHTTPLogger(ctx, logger)
 	}

@@ -26,6 +26,32 @@ func (*SystemLoggerClock) Now() time.Time {
 	return time.Now()
 }
 
+type uuidGeneratorContextKey string
+
+// UUIDGeneratorContextKey can be used to fake UUID generator.
+const UUIDGeneratorContextKey uuidGeneratorContextKey = "uuid-generator"
+
+// UUIDGenerator is a UUID generator strategy.
+type UUIDGenerator interface {
+	Generate() string
+}
+
+// RandomUUIDGenerator generates secure random UUID v4.
+type RandomUUIDGenerator struct{}
+
+// Generate generates secure random UUID.
+func (g *RandomUUIDGenerator) Generate() string {
+	return GenerateUUID4()
+}
+
+// EmptyUUIDGenerator returns empty string.
+type EmptyUUIDGenerator struct{}
+
+// Generate returns empty string.
+func (g *EmptyUUIDGenerator) Generate() string {
+	return ""
+}
+
 type logWriterContextKey string
 
 // LogWriterContextKey can be used to spy log writes.
@@ -64,7 +90,7 @@ func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) *TextualHT
 	return &TextualHTTPLogger{logger: logger, writer: &LoggerLogWriter{logger: logger}}
 }
 
-func createJSONHTTPLogger(ctx context.Context, logger *log.Logger) *JSONHTTPLogger {
+func createJSONHTTPLogger(ctx context.Context, config *Config, logger *log.Logger) *JSONHTTPLogger {
 	var clock LoggerClock
 	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
 	if hasExternalClock {
@@ -72,9 +98,20 @@ func createJSONHTTPLogger(ctx context.Context, logger *log.Logger) *JSONHTTPLogg
 	} else {
 		clock = &SystemLoggerClock{}
 	}
+	var uuidGenerator UUIDGenerator
+	if config.GenerateLogID {
+		externalUUIDGenerator, hasExternalUUIDGenerator := ctx.Value(UUIDGeneratorContextKey).(UUIDGenerator)
+		if hasExternalUUIDGenerator {
+			uuidGenerator = externalUUIDGenerator
+		} else {
+			uuidGenerator = &RandomUUIDGenerator{}
+		}
+	} else {
+		uuidGenerator = &EmptyUUIDGenerator{}
+	}
 	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
 	if hasExternalLogWriter {
-		return &JSONHTTPLogger{clock: clock, logger: logger, writer: externalLogWriter}
+		return &JSONHTTPLogger{clock: clock, uuidGenerator: uuidGenerator, logger: logger, writer: externalLogWriter}
 	}
-	return &JSONHTTPLogger{clock: clock, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
+	return &JSONHTTPLogger{clock: clock, uuidGenerator: uuidGenerator, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
 }

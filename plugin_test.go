@@ -21,6 +21,12 @@ func (c *TestLoggerClock) Now() time.Time {
 	return time.Date(2020, time.December, 15, 13, 30, 40, 999999999, time.UTC)
 }
 
+type TestUUIDGenerator struct{}
+
+func (g *TestUUIDGenerator) Generate() string {
+	return "test-id"
+}
+
 type TestLogWriter struct {
 	t        *testing.T
 	expected string
@@ -38,8 +44,9 @@ func (w *TestLogWriter) Write(log string) error {
 func createContext(t *testing.T, expectedLog string) context.Context {
 	t.Helper()
 	clock := &TestLoggerClock{}
+	uuidGenerator := &TestUUIDGenerator{}
 	logWriter := &TestLogWriter{t: t, expected: expectedLog}
-	return context.WithValue(context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, logWriter), traefiklogger.ClockContextKey, clock)
+	return context.WithValue(context.WithValue(context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, logWriter), traefiklogger.ClockContextKey, clock), traefiklogger.UUIDGeneratorContextKey, uuidGenerator)
 }
 
 // doubleTheNumber reads the request, parses it as integer then returns its double.
@@ -203,6 +210,34 @@ func TestGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
 	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET http://localhost/get: 200 OK HTTP/1.1\n\nResponse Content Length: 1\n\nResponse Body:\n5\n\n"})
+
+	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/get", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.RemoteAddr = "127.0.0.1"
+
+	handler.ServeHTTP(recorder, req)
+
+	// Check the response body
+	if recorder.Body.String() != "5" {
+		t.Errorf("Expected response body: '5', got: '%s'", recorder.Body.String())
+	}
+}
+
+func TestGetWithLogID(t *testing.T) {
+	ctx := createContext(t, "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"GET http://localhost/get HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"GET\",\"path\":\"http://localhost/get\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"responseContentLength\":1,\"responseBody\":\"5\",\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n")
+
+	cfg := traefiklogger.CreateConfig()
+	cfg.LogFormat = traefiklogger.JSONFormat
+	cfg.GenerateLogID = true
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
 	if err != nil {
