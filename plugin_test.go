@@ -127,8 +127,6 @@ func TestPost(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		recorder := httptest.NewRecorder()
-
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/post", strings.NewReader("5"))
 		if err != nil {
 			t.Fatal(err)
@@ -137,6 +135,7 @@ func TestPost(t *testing.T) {
 		req.Header.Set("Accept", "text/plain")
 		req.Header.Set("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")
 
+		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, req)
 
 		// Check the response body
@@ -152,32 +151,40 @@ func TestShortPost(t *testing.T) {
 		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST http://localhost/short-post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"http://localhost/short-post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":[\"text/plain\"]},\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
 	}
 
-	for logFormat, expectedLog := range expectedLogs {
-		cfg := traefiklogger.CreateConfig()
-		cfg.LogFormat = logFormat
-		cfg.BodyContentTypes = []string{"text/html"}
+	cfgWithInterestedContentTypes := traefiklogger.CreateConfig()
+	cfgWithInterestedContentTypes.BodyContentTypes = []string{"text/html"}
 
-		ctx := createContext(t, expectedLog)
+	cfgWithBodyRedact := traefiklogger.CreateConfig()
+	cfgWithBodyRedact.RequestBodyRedact = "POST http://localhost/short-post"
+	cfgWithBodyRedact.ResponseBodyRedact = "POST http://localhost/short-post"
 
-		handler, err := traefiklogger.New(ctx, http.HandlerFunc(doubleTheNumber), cfg, "logger-plugin")
-		if err != nil {
-			t.Fatal(err)
-		}
+	configs := []*traefiklogger.Config{cfgWithInterestedContentTypes, cfgWithBodyRedact}
 
-		recorder := httptest.NewRecorder()
+	for _, cfg := range configs {
+		for logFormat, expectedLog := range expectedLogs {
+			cfg.LogFormat = logFormat
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/short-post", strings.NewReader("5"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.RemoteAddr = "127.0.0.1"
-		req.Header.Set("Accept", "text/plain")
+			ctx := createContext(t, expectedLog)
 
-		handler.ServeHTTP(recorder, req)
+			handler, err := traefiklogger.New(ctx, http.HandlerFunc(doubleTheNumber), cfg, "logger-plugin")
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		// Check the response body
-		if recorder.Body.String() != "10" {
-			t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/short-post", strings.NewReader("5"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.RemoteAddr = "127.0.0.1"
+			req.Header.Set("Accept", "text/plain")
+
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, req)
+
+			// Check the response body
+			if recorder.Body.String() != "10" {
+				t.Errorf("Expected response body: '10', got: '%s'", recorder.Body.String())
+			}
 		}
 	}
 }
@@ -192,14 +199,13 @@ func TestEmptyPost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/empty-post", strings.NewReader("5"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body
@@ -218,14 +224,13 @@ func TestGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/get", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body
@@ -246,14 +251,13 @@ func TestGetWithoutLogID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/get", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body
@@ -272,14 +276,13 @@ func TestGetError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/get", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body
@@ -299,8 +302,6 @@ func TestGetWebsocket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "ws://localhost/ws", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -308,6 +309,7 @@ func TestGetWebsocket(t *testing.T) {
 	req.RemoteAddr = "127.0.0.1"
 	req.Header.Set("Upgrade", "websocket")
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body
@@ -329,14 +331,13 @@ func TestEmptyGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/empty-get", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body
@@ -357,14 +358,13 @@ func TestDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/disabled", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
 
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	// Check the response body

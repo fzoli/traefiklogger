@@ -14,12 +14,14 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled          bool      `json:"enabled"`
-	LogFormat        LogFormat `json:"logFormat"`
-	GenerateLogID    bool      `json:"generateLogId,omitempty"`
-	Name             string    `json:"name,omitempty"`
-	BodyContentTypes []string  `json:"bodyContentTypes,omitempty"`
-	JWTHeaders       []string  `json:"jwtHeaders,omitempty"`
+	Enabled            bool      `json:"enabled"`
+	LogFormat          LogFormat `json:"logFormat"`
+	GenerateLogID      bool      `json:"generateLogId,omitempty"`
+	Name               string    `json:"name,omitempty"`
+	BodyContentTypes   []string  `json:"bodyContentTypes,omitempty"`
+	JWTHeaders         []string  `json:"jwtHeaders,omitempty"`
+	RequestBodyRedact  string    `json:"requestBodyRedact,omitempty"`
+	ResponseBodyRedact string    `json:"responseBodyRedact,omitempty"`
 }
 
 // LogFormat specifies the log format.
@@ -64,22 +66,26 @@ type LogRecord struct {
 
 // LoggerMiddleware a Logger plugin.
 type LoggerMiddleware struct {
-	name         string
-	logger       HTTPLogger
-	contentTypes []string
-	jwtHeaders   []string
-	next         http.Handler
+	name                string
+	logger              HTTPLogger
+	contentTypes        []string
+	jwtHeaders          []string
+	requestBodyRedacts  []string
+	responseBodyRedacts []string
+	next                http.Handler
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		Enabled:          true,
-		LogFormat:        TextFormat,
-		GenerateLogID:    true,
-		Name:             "HTTP",
-		BodyContentTypes: []string{},
-		JWTHeaders:       []string{},
+		Enabled:            true,
+		LogFormat:          TextFormat,
+		GenerateLogID:      true,
+		Name:               "HTTP",
+		BodyContentTypes:   []string{},
+		JWTHeaders:         []string{},
+		RequestBodyRedact:  "",
+		ResponseBodyRedact: "",
 	}
 }
 
@@ -101,11 +107,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 
 	return &LoggerMiddleware{
-		name:         config.Name,
-		logger:       httpLogger,
-		contentTypes: config.BodyContentTypes,
-		jwtHeaders:   config.JWTHeaders,
-		next:         next,
+		name:                config.Name,
+		logger:              httpLogger,
+		contentTypes:        config.BodyContentTypes,
+		jwtHeaders:          config.JWTHeaders,
+		requestBodyRedacts:  strings.Split(config.RequestBodyRedact, ";"),
+		responseBodyRedacts: strings.Split(config.ResponseBodyRedact, ";"),
+		next:                next,
 	}, nil
 }
 
@@ -118,7 +126,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mrc := &multiReadCloser{
 		rc:       r.Body,
 		buf:      &bytes.Buffer{},
-		withBody: needToLogBody(m, r, "Content-Type"),
+		withBody: !hasRedactedBody(r, m.requestBodyRedacts) && needToLogBody(m, r, "Content-Type"),
 	}
 	r.Body = mrc
 
@@ -126,7 +134,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
-		withBody:       needToLogBody(m, r, "Accept"),
+		withBody:       !hasRedactedBody(r, m.responseBodyRedacts) && needToLogBody(m, r, "Accept"),
 	}
 
 	requestHeaders := m.copyHeaders(r.Header)
@@ -159,6 +167,19 @@ func needToLogBody(m *LoggerMiddleware, r *http.Request, header string) bool {
 		}
 	}
 	return len(m.contentTypes) == 0
+}
+
+func hasRedactedBody(r *http.Request, redacts []string) bool {
+	for _, requestBodyRedact := range redacts {
+		if len(requestBodyRedact) == 0 {
+			continue
+		}
+		method := r.Method + " " + r.URL.String()
+		if strings.HasPrefix(method, requestBodyRedact) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
