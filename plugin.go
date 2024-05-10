@@ -216,7 +216,7 @@ func decodeJWTHeader(value string) string {
 	if err != nil {
 		return value
 	}
-	return strings.Join(decodedParts, ".")
+	return "Bearer " + strings.Join(decodedParts, ".")
 }
 
 func base64Decode(encodedString string) (string, error) {

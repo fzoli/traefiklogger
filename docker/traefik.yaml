@@ -14,4 +14,4 @@ experimental:
   plugins:
     traefiklogger:
       moduleName: "github.com/fzoli/traefiklogger"
-      version: "v0.7.13"
+      version: "v0.7.14"
