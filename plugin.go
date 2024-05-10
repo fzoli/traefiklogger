@@ -4,7 +4,6 @@ package traefiklogger
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"io"
 	"log"
 	"net/http"
@@ -20,6 +19,7 @@ type Config struct {
 	Name               string    `json:"name,omitempty"`
 	BodyContentTypes   []string  `json:"bodyContentTypes,omitempty"`
 	JWTHeaders         []string  `json:"jwtHeaders,omitempty"`
+	HeaderRedacts      []string  `json:"headerRedacts,omitempty"`
 	RequestBodyRedact  string    `json:"requestBodyRedact,omitempty"`
 	ResponseBodyRedact string    `json:"responseBodyRedact,omitempty"`
 }
@@ -70,6 +70,7 @@ type LoggerMiddleware struct {
 	logger              HTTPLogger
 	contentTypes        []string
 	jwtHeaders          []string
+	headerRedacts       []string
 	requestBodyRedacts  []string
 	responseBodyRedacts []string
 	next                http.Handler
@@ -84,6 +85,7 @@ func CreateConfig() *Config {
 		Name:               "HTTP",
 		BodyContentTypes:   []string{},
 		JWTHeaders:         []string{},
+		HeaderRedacts:      []string{},
 		RequestBodyRedact:  "",
 		ResponseBodyRedact: "",
 	}
@@ -111,6 +113,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		logger:              httpLogger,
 		contentTypes:        config.BodyContentTypes,
 		jwtHeaders:          config.JWTHeaders,
+		headerRedacts:       config.HeaderRedacts,
 		requestBodyRedacts:  strings.Split(config.RequestBodyRedact, ";"),
 		responseBodyRedacts: strings.Split(config.ResponseBodyRedact, ";"),
 		next:                next,
@@ -185,74 +188,19 @@ func hasRedactedBody(r *http.Request, redacts []string) bool {
 func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 	newHeader := make(http.Header)
 	for key, value := range original {
-		decodeAsJWT := containsIgnoreCase(m.jwtHeaders, key)
-		if decodeAsJWT {
-			newHeader[key] = decodeHeaders(value, decodeJWTHeader)
-		} else {
-			newHeader[key] = value
+		if containsIgnoreCase(m.headerRedacts, key) {
+			newHeader[key] = decodeHeaders(value, func(_ string) string {
+				return "██"
+			})
+			continue
 		}
+		if containsIgnoreCase(m.jwtHeaders, key) {
+			newHeader[key] = decodeHeaders(value, decodeJWTHeader)
+			continue
+		}
+		newHeader[key] = value
 	}
 	return newHeader
-}
-
-func decodeHeaders(value []string, decoder func(string) string) []string {
-	decodedValues := make([]string, len(value))
-	for i, v := range value {
-		decodedValues[i] = decoder(v)
-	}
-	return decodedValues
-}
-
-func decodeJWTHeader(value string) string {
-	withBearer := strings.HasPrefix(value, "Bearer ")
-	var token string
-	if withBearer {
-		token = strings.TrimPrefix(value, "Bearer ")
-	} else {
-		token = value
-	}
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return value
-	}
-	decodedParts, err := decodeEach(parts[0:2], base64Decode)
-	if err != nil {
-		return value
-	}
-	if withBearer {
-		return "Bearer " + strings.Join(decodedParts, ".")
-	}
-	return strings.Join(decodedParts, ".")
-}
-
-func base64Decode(encodedString string) (string, error) {
-	decodedBytes, err := base64.RawURLEncoding.DecodeString(encodedString)
-	if err != nil {
-		return "", err
-	}
-	return string(decodedBytes), nil
-}
-
-func decodeEach(value []string, decoder func(string) (string, error)) ([]string, error) {
-	decodedValues := make([]string, len(value))
-	for i, v := range value {
-		decoded, err := decoder(v)
-		if err == nil {
-			decodedValues[i] = decoded
-		} else {
-			return value, err
-		}
-	}
-	return decodedValues, nil
-}
-
-func containsIgnoreCase(values []string, value string) bool {
-	for _, str := range values {
-		if strings.Contains(strings.ToLower(str), strings.ToLower(value)) {
-			return true
-		}
-	}
-	return false
 }
 
 type multiResponseWriter struct {

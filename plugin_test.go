@@ -147,14 +147,16 @@ func TestPost(t *testing.T) {
 
 func TestShortPost(t *testing.T) {
 	expectedLogs := map[traefiklogger.LogFormat]string{
-		traefiklogger.TextFormat: "127.0.0.1 POST http://localhost/short-post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\n",
-		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST http://localhost/short-post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"http://localhost/short-post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":[\"text/plain\"]},\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
+		traefiklogger.TextFormat: "127.0.0.1 POST http://localhost/short-post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\nAuthorization: ██\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\n",
+		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST http://localhost/short-post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"http://localhost/short-post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":[\"text/plain\"],\"Authorization\":[\"██\"]},\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
 	}
 
 	cfgWithInterestedContentTypes := traefiklogger.CreateConfig()
+	cfgWithInterestedContentTypes.HeaderRedacts = []string{"Authorization"}
 	cfgWithInterestedContentTypes.BodyContentTypes = []string{"text/html"}
 
 	cfgWithBodyRedact := traefiklogger.CreateConfig()
+	cfgWithBodyRedact.HeaderRedacts = []string{"Authorization"}
 	cfgWithBodyRedact.RequestBodyRedact = "POST http://localhost/short-post"
 	cfgWithBodyRedact.ResponseBodyRedact = "POST http://localhost/short-post"
 
@@ -177,6 +179,7 @@ func TestShortPost(t *testing.T) {
 			}
 			req.RemoteAddr = "127.0.0.1"
 			req.Header.Set("Accept", "text/plain")
+			req.Header.Set("Authorization", "secret")
 
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, req)
