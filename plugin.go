@@ -189,9 +189,7 @@ func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 	newHeader := make(http.Header)
 	for key, value := range original {
 		if containsIgnoreCase(m.headerRedacts, key) {
-			newHeader[key] = decodeHeaders(value, func(_ string) string {
-				return "██"
-			})
+			newHeader[key] = decodeHeaders(value, redact)
 			continue
 		}
 		if containsIgnoreCase(m.jwtHeaders, key) {
@@ -201,6 +199,13 @@ func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 		newHeader[key] = value
 	}
 	return newHeader
+}
+
+func redact(text string) string {
+	if len(text) == 0 {
+		return ""
+	}
+	return "██"
 }
 
 type multiResponseWriter struct {
