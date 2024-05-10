@@ -4,6 +4,7 @@ package traefiklogger
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"log"
 	"net/http"
@@ -18,6 +19,7 @@ type Config struct {
 	GenerateLogID    bool      `json:"generateLogId,omitempty"`
 	Name             string    `json:"name,omitempty"`
 	BodyContentTypes []string  `json:"bodyContentTypes,omitempty"`
+	JWTHeaders       []string  `json:"jwtHeaders,omitempty"`
 }
 
 // LogFormat specifies the log format.
@@ -65,6 +67,7 @@ type LoggerMiddleware struct {
 	name         string
 	logger       HTTPLogger
 	contentTypes []string
+	jwtHeaders   []string
 	next         http.Handler
 }
 
@@ -76,6 +79,7 @@ func CreateConfig() *Config {
 		GenerateLogID:    true,
 		Name:             "HTTP",
 		BodyContentTypes: []string{},
+		JWTHeaders:       []string{},
 	}
 }
 
@@ -100,6 +104,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		name:         config.Name,
 		logger:       httpLogger,
 		contentTypes: config.BodyContentTypes,
+		jwtHeaders:   config.JWTHeaders,
 		next:         next,
 	}, nil
 }
@@ -124,11 +129,11 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		withBody:       needToLogBody(m, r, "Accept"),
 	}
 
-	requestHeaders := copyHeaders(r.Header)
+	requestHeaders := m.copyHeaders(r.Header)
 
 	m.next.ServeHTTP(mrw, r)
 
-	responseHeaders := copyHeaders(w.Header())
+	responseHeaders := m.copyHeaders(w.Header())
 
 	logRecord := &LogRecord{
 		System:                m.name,
@@ -149,19 +154,78 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func needToLogBody(m *LoggerMiddleware, r *http.Request, header string) bool {
 	for _, contentType := range m.contentTypes {
-		if strings.Contains(r.Header.Get(header), contentType) {
+		if strings.Contains(strings.ToLower(r.Header.Get(header)), strings.ToLower(contentType)) {
 			return true
 		}
 	}
 	return len(m.contentTypes) == 0
 }
 
-func copyHeaders(original http.Header) http.Header {
+func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 	newHeader := make(http.Header)
 	for key, value := range original {
-		newHeader[key] = value
+		decodeAsJWT := containsIgnoreCase(m.jwtHeaders, key)
+		if decodeAsJWT {
+			newHeader[key] = decodeHeaders(value, decodeJWTHeader)
+		} else {
+			newHeader[key] = value
+		}
 	}
 	return newHeader
+}
+
+func decodeHeaders(value []string, decoder func(string) string) []string {
+	decodedValues := make([]string, len(value))
+	for i, v := range value {
+		decodedValues[i] = decoder(v)
+	}
+	return decodedValues
+}
+
+func decodeJWTHeader(value string) string {
+	if !strings.HasPrefix(value, "Bearer ") {
+		return value
+	}
+	token := strings.TrimPrefix(value, "Bearer ")
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return value
+	}
+	decodedParts, err := decodeEach(parts[0:2], base64Decode)
+	if err != nil {
+		return value
+	}
+	return strings.Join(decodedParts, ".")
+}
+
+func base64Decode(encodedString string) (string, error) {
+	decodedBytes, err := base64.RawURLEncoding.DecodeString(encodedString)
+	if err != nil {
+		return "", err
+	}
+	return string(decodedBytes), nil
+}
+
+func decodeEach(value []string, decoder func(string) (string, error)) ([]string, error) {
+	decodedValues := make([]string, len(value))
+	for i, v := range value {
+		decoded, err := decoder(v)
+		if err == nil {
+			decodedValues[i] = decoded
+		} else {
+			return value, err
+		}
+	}
+	return decodedValues, nil
+}
+
+func containsIgnoreCase(values []string, value string) bool {
+	for _, str := range values {
+		if strings.Contains(strings.ToLower(str), strings.ToLower(value)) {
+			return true
+		}
+	}
+	return false
 }
 
 type multiResponseWriter struct {
