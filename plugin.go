@@ -204,10 +204,13 @@ func decodeHeaders(value []string, decoder func(string) string) []string {
 }
 
 func decodeJWTHeader(value string) string {
-	if !strings.HasPrefix(value, "Bearer ") {
-		return value
+	withBearer := strings.HasPrefix(value, "Bearer ")
+	var token string
+	if withBearer {
+		token = strings.TrimPrefix(value, "Bearer ")
+	} else {
+		token = value
 	}
-	token := strings.TrimPrefix(value, "Bearer ")
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return value
@@ -216,7 +219,10 @@ func decodeJWTHeader(value string) string {
 	if err != nil {
 		return value
 	}
-	return "Bearer " + strings.Join(decodedParts, ".")
+	if withBearer {
+		return "Bearer " + strings.Join(decodedParts, ".")
+	}
+	return strings.Join(decodedParts, ".")
 }
 
 func base64Decode(encodedString string) (string, error) {
