@@ -82,6 +82,16 @@ func (w *LoggerLogWriter) Write(log string) error {
 	return nil
 }
 
+func createHTTPLogger(ctx context.Context, config *Config) HTTPLogger {
+	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+	switch config.LogFormat {
+	case JSONFormat:
+		return createJSONHTTPLogger(ctx, config, logger)
+	default:
+		return createTextualHTTPLogger(ctx, logger)
+	}
+}
+
 func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) *TextualHTTPLogger {
 	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
 	if hasExternalLogWriter {
@@ -91,27 +101,30 @@ func createTextualHTTPLogger(ctx context.Context, logger *log.Logger) *TextualHT
 }
 
 func createJSONHTTPLogger(ctx context.Context, config *Config, logger *log.Logger) *JSONHTTPLogger {
-	var clock LoggerClock
-	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
-	if hasExternalClock {
-		clock = externalClock
-	} else {
-		clock = &SystemLoggerClock{}
-	}
-	var uuidGenerator UUIDGenerator
-	if config.GenerateLogID {
-		externalUUIDGenerator, hasExternalUUIDGenerator := ctx.Value(UUIDGeneratorContextKey).(UUIDGenerator)
-		if hasExternalUUIDGenerator {
-			uuidGenerator = externalUUIDGenerator
-		} else {
-			uuidGenerator = &RandomUUIDGenerator{}
-		}
-	} else {
-		uuidGenerator = &EmptyUUIDGenerator{}
-	}
+	clock := createClock(ctx)
+	uuidGenerator := createUUIDGenerator(ctx, config)
 	externalLogWriter, hasExternalLogWriter := ctx.Value(LogWriterContextKey).(LogWriter)
 	if hasExternalLogWriter {
 		return &JSONHTTPLogger{clock: clock, uuidGenerator: uuidGenerator, logger: logger, writer: externalLogWriter}
 	}
 	return &JSONHTTPLogger{clock: clock, uuidGenerator: uuidGenerator, logger: logger, writer: &FileLogWriter{file: os.Stdout}}
+}
+
+func createUUIDGenerator(ctx context.Context, config *Config) UUIDGenerator {
+	if config.GenerateLogID {
+		externalUUIDGenerator, hasExternalUUIDGenerator := ctx.Value(UUIDGeneratorContextKey).(UUIDGenerator)
+		if hasExternalUUIDGenerator {
+			return externalUUIDGenerator
+		}
+		return &RandomUUIDGenerator{}
+	}
+	return &EmptyUUIDGenerator{}
+}
+
+func createClock(ctx context.Context) LoggerClock {
+	externalClock, hasExternalClock := ctx.Value(ClockContextKey).(LoggerClock)
+	if hasExternalClock {
+		return externalClock
+	}
+	return &SystemLoggerClock{}
 }

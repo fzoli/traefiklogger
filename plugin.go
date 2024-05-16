@@ -5,9 +5,7 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -62,11 +60,13 @@ type LogRecord struct {
 	ResponseHeaders       http.Header
 	ResponseBody          *bytes.Buffer
 	ResponseContentLength int
+	DurationMs            float64
 }
 
 // LoggerMiddleware a Logger plugin.
 type LoggerMiddleware struct {
 	name                string
+	clock               LoggerClock
 	logger              HTTPLogger
 	contentTypes        []string
 	jwtHeaders          []string
@@ -99,18 +99,10 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		}, nil
 	}
 
-	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
-	var httpLogger HTTPLogger
-	switch config.LogFormat {
-	case JSONFormat:
-		httpLogger = createJSONHTTPLogger(ctx, config, logger)
-	default:
-		httpLogger = createTextualHTTPLogger(ctx, logger)
-	}
-
 	return &LoggerMiddleware{
 		name:                config.Name,
-		logger:              httpLogger,
+		clock:               createClock(ctx),
+		logger:              createHTTPLogger(ctx, config),
 		contentTypes:        config.BodyContentTypes,
 		jwtHeaders:          config.JWTHeaders,
 		headerRedacts:       config.HeaderRedacts,
@@ -142,9 +134,12 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	requestHeaders := m.copyHeaders(r.Header)
 
+	startTime := m.clock.Now()
 	m.next.ServeHTTP(mrw, r)
+	endTime := m.clock.Now()
 
 	responseHeaders := m.copyHeaders(w.Header())
+	durationMs := float64(endTime.UnixMicro()-startTime.UnixMicro()) / 1000.0
 
 	logRecord := &LogRecord{
 		System:                m.name,
@@ -158,6 +153,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseHeaders:       responseHeaders,
 		ResponseBody:          mrw.body,
 		ResponseContentLength: mrw.length,
+		DurationMs:            durationMs,
 	}
 
 	m.logger.print(logRecord)
@@ -199,13 +195,6 @@ func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 		newHeader[key] = value
 	}
 	return newHeader
-}
-
-func redact(text string) string {
-	if len(text) == 0 {
-		return ""
-	}
-	return "██"
 }
 
 type multiResponseWriter struct {

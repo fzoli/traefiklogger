@@ -62,6 +62,7 @@ linters:
     - forbidigo
     - varnamelen
     - tagliatelle
+    - ireturn
 
 issues:
   exclude-use-default: false

@@ -29,6 +29,7 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		Status                int                 `json:"status"`
 		StatusText            string              `json:"statusText"`
 		Proto                 string              `json:"proto"`
+		DurationMs            float64             `json:"durationMs"`
 		RequestHeaders        map[string][]string `json:"requestHeaders,omitempty"`
 		RequestBody           string              `json:"requestBody,omitempty"`
 		ResponseHeaders       map[string][]string `json:"responseHeaders,omitempty"`
@@ -47,6 +48,7 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		Status:                record.StatusCode,
 		StatusText:            http.StatusText(record.StatusCode),
 		Proto:                 record.Proto,
+		DurationMs:            record.DurationMs,
 		RequestHeaders:        record.RequestHeaders,
 		RequestBody:           record.RequestBody.String(),
 		ResponseHeaders:       record.ResponseHeaders,

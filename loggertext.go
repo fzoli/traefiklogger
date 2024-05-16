@@ -40,6 +40,7 @@ func (thl *TextualHTTPLogger) print(record *LogRecord) {
 	}
 
 	builder.WriteString(fmt.Sprintf("\nResponse Content Length: %d\n", record.ResponseContentLength))
+	builder.WriteString(fmt.Sprintf("\nDuration: %.3f ms\n", record.DurationMs))
 
 	if record.ResponseBody.Len() > 0 {
 		builder.WriteString("\nResponse Body:\n")

@@ -11,6 +11,13 @@ func containsIgnoreCase(values []string, value string) bool {
 	return false
 }
 
+func redact(text string) string {
+	if len(text) == 0 {
+		return ""
+	}
+	return "██"
+}
+
 func decodeEach(value []string, decoder func(string) (string, error)) ([]string, error) {
 	decodedValues := make([]string, len(value))
 	for i, v := range value {

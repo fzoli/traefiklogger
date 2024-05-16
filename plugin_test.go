@@ -111,8 +111,8 @@ func alwaysFive(rw http.ResponseWriter, req *http.Request) {
 
 func TestPost(t *testing.T) {
 	expectedLogs := map[traefiklogger.LogFormat]string{
-		traefiklogger.TextFormat: "127.0.0.1 POST /post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\nAuthorization: Bearer {\"alg\":\"HS256\",\"typ\":\"JWT\"}.{\"sub\":\"1234567890\",\"name\":\"John Doe\",\"iat\":1516239022}\n\nRequest Body:\n5\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\nResponse Body:\n10\n\n",
-		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST /post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"/post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":[\"text/plain\"],\"Authorization\":[\"Bearer {\\\"alg\\\":\\\"HS256\\\",\\\"typ\\\":\\\"JWT\\\"}.{\\\"sub\\\":\\\"1234567890\\\",\\\"name\\\":\\\"John Doe\\\",\\\"iat\\\":1516239022}\"]},\"requestBody\":\"5\",\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"responseBody\":\"10\",\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
+		traefiklogger.TextFormat: "127.0.0.1 POST /post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\nAuthorization: Bearer {\"alg\":\"HS256\",\"typ\":\"JWT\"}.{\"sub\":\"1234567890\",\"name\":\"John Doe\",\"iat\":1516239022}\n\nRequest Body:\n5\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\nDuration: 0.000 ms\n\nResponse Body:\n10\n\n",
+		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST /post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"/post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"durationMs\":0,\"requestHeaders\":{\"Accept\":[\"text/plain\"],\"Authorization\":[\"Bearer {\\\"alg\\\":\\\"HS256\\\",\\\"typ\\\":\\\"JWT\\\"}.{\\\"sub\\\":\\\"1234567890\\\",\\\"name\\\":\\\"John Doe\\\",\\\"iat\\\":1516239022}\"]},\"requestBody\":\"5\",\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"responseBody\":\"10\",\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
 	}
 
 	for logFormat, expectedLog := range expectedLogs {
@@ -147,8 +147,8 @@ func TestPost(t *testing.T) {
 
 func TestShortPost(t *testing.T) {
 	expectedLogs := map[traefiklogger.LogFormat]string{
-		traefiklogger.TextFormat: "127.0.0.1 POST /short-post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\nAuthorization: ██\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\n",
-		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST /short-post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"/short-post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"requestHeaders\":{\"Accept\":[\"text/plain\"],\"Authorization\":[\"██\"]},\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
+		traefiklogger.TextFormat: "127.0.0.1 POST /short-post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\nAuthorization: ██\n\nResponse Headers:\nContent-Type: text/plain\n\nResponse Content Length: 2\n\nDuration: 0.000 ms\n\n",
+		traefiklogger.JSONFormat: "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"POST /short-post HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"POST\",\"path\":\"/short-post\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"durationMs\":0,\"requestHeaders\":{\"Accept\":[\"text/plain\"],\"Authorization\":[\"██\"]},\"responseHeaders\":{\"Content-Type\":[\"text/plain\"]},\"responseContentLength\":2,\"ecs.version\":\"1.6.0\",\"logId\":\"test-id\"}\n",
 	}
 
 	cfgWithInterestedContentTypes := traefiklogger.CreateConfig()
@@ -195,7 +195,7 @@ func TestShortPost(t *testing.T) {
 func TestEmptyPost(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 POST /empty-post: 200 OK HTTP/1.1\n\nRequest Body:\n5\n\nResponse Content Length: 0\n\n"})
+	ctx := createContext(t, "127.0.0.1 POST /empty-post: 200 OK HTTP/1.1\n\nRequest Body:\n5\n\nResponse Content Length: 0\n\nDuration: 0.000 ms\n\n")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(blackHole), cfg, "logger-plugin")
 	if err != nil {
@@ -220,7 +220,7 @@ func TestEmptyPost(t *testing.T) {
 func TestGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET /get: 200 OK HTTP/1.1\n\nResponse Content Length: 1\n\nResponse Body:\n5\n\n"})
+	ctx := createContext(t, "127.0.0.1 GET /get: 200 OK HTTP/1.1\n\nResponse Content Length: 1\n\nDuration: 0.000 ms\n\nResponse Body:\n5\n\n")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
 	if err != nil {
@@ -243,7 +243,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetWithoutLogID(t *testing.T) {
-	ctx := createContext(t, "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"GET /get-without-log-id HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"GET\",\"path\":\"/get-without-log-id\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"responseContentLength\":1,\"responseBody\":\"5\",\"ecs.version\":\"1.6.0\"}\n")
+	ctx := createContext(t, "{\"log.level\":\"info\",\"@timestamp\":\"2020-12-15T13:30:40.999Z\",\"message\":\"GET /get-without-log-id HTTP/1.1 200\",\"systemName\":\"HTTP\",\"remoteAddress\":\"127.0.0.1\",\"method\":\"GET\",\"path\":\"/get-without-log-id\",\"status\":200,\"statusText\":\"OK\",\"proto\":\"HTTP/1.1\",\"durationMs\":0,\"responseContentLength\":1,\"responseBody\":\"5\",\"ecs.version\":\"1.6.0\"}\n")
 
 	cfg := traefiklogger.CreateConfig()
 	cfg.LogFormat = traefiklogger.JSONFormat
@@ -272,7 +272,7 @@ func TestGetWithoutLogID(t *testing.T) {
 func TestGetError(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET /get-error: 500 Internal Server Error HTTP/1.1\n\nResponse Headers:\nContent-Type: text/plain; charset=utf-8\nX-Content-Type-Options: nosniff\n\nResponse Content Length: 22\n\nResponse Body:\nInternal Server Error\n\n\n"})
+	ctx := createContext(t, "127.0.0.1 GET /get-error: 500 Internal Server Error HTTP/1.1\n\nResponse Headers:\nContent-Type: text/plain; charset=utf-8\nX-Content-Type-Options: nosniff\n\nResponse Content Length: 22\n\nDuration: 0.000 ms\n\nResponse Body:\nInternal Server Error\n\n\n")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysError), cfg, "logger-plugin")
 	if err != nil {
@@ -297,8 +297,7 @@ func TestGetError(t *testing.T) {
 func TestGetWebsocket(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	lw := &TestLogWriter{t: t, expected: "LogWriter should not have been called"}
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, lw)
+	ctx := createContext(t, "LogWriter should not have been called")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
 	if err != nil {
@@ -324,7 +323,7 @@ func TestGetWebsocket(t *testing.T) {
 func TestEmptyGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, &TestLogWriter{t: t, expected: "127.0.0.1 GET /empty-get: 200 OK HTTP/1.1\n\nResponse Content Length: 0\n\n"})
+	ctx := createContext(t, "127.0.0.1 GET /empty-get: 200 OK HTTP/1.1\n\nResponse Content Length: 0\n\nDuration: 0.000 ms\n\n")
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 	})
@@ -353,8 +352,7 @@ func TestDisabled(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 	cfg.Enabled = false
 
-	lw := &TestLogWriter{t: t, expected: "LogWriter should not have been called"}
-	ctx := context.WithValue(context.Background(), traefiklogger.LogWriterContextKey, lw)
+	ctx := createContext(t, "LogWriter should not have been called")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
 	if err != nil {
