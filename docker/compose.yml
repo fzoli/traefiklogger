@@ -12,19 +12,24 @@ services:
       - "co.elastic.logs/json.add_error_key=true"
       - "co.elastic.logs/json.expand_keys=true"
     ports:
-      - "127.0.0.1:8000:80"
-      - "127.0.0.1:8001:8080"
+      - "127.0.0.1:8000:80/tcp" # HTTP/1 (cleartext)
+      - "127.0.0.1:8443:8443/tcp" # HTTP/2 and HTTP/1 (TLS)
+      - "127.0.0.1:8443:8443/udp" # HTTP/3
+      - "127.0.0.1:8001:8080/tcp" # Traefik dashboard HTTP/1
     networks:
       - traefik
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./traefik.yaml:/traefik.yaml
+      - ./traefik.yaml:/traefik.yaml:ro
+      - ./traefik:/traefik:ro
+      - ./cert:/cert:ro
 
   nginx:
     image: nginx:latest
     restart: always
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.nginx.tls=true"
       - "traefik.http.routers.nginx.rule=PathPrefix(`/example`)"
       - "traefik.http.services.nginx.loadbalancer.server.port=80"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Enabled=true"
