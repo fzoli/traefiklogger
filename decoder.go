@@ -7,14 +7,13 @@ import (
 	"log"
 )
 
+// HTTPBodyDecoderFactory selects which decoder should run.
 type HTTPBodyDecoderFactory struct {
-	logger      *log.Logger
 	rawDecoder  *RawHTTPDecoder
 	gzipDecoder *GZipHTTPDecoder
 }
 
 func (f *HTTPBodyDecoderFactory) create(encoding string) HTTPBodyDecoder {
-	f.logger.Println(encoding)
 	if encoding == "gzip" {
 		return f.gzipDecoder
 	}
@@ -23,7 +22,6 @@ func (f *HTTPBodyDecoderFactory) create(encoding string) HTTPBodyDecoder {
 
 func createHTTPBodyDecoderFactory(logger *log.Logger) *HTTPBodyDecoderFactory {
 	return &HTTPBodyDecoderFactory{
-		logger:      logger,
 		rawDecoder:  &RawHTTPDecoder{},
 		gzipDecoder: &GZipHTTPDecoder{logger: logger},
 	}
@@ -42,22 +40,23 @@ func (d *RawHTTPDecoder) decode(content *bytes.Buffer) (string, error) {
 	return content.String(), nil
 }
 
+// GZipHTTPDecoder extracts the gzip content.
 type GZipHTTPDecoder struct {
 	logger *log.Logger
 }
 
 func (d *GZipHTTPDecoder) decode(content *bytes.Buffer) (string, error) {
-	gz, err := gzip.NewReader(content)
+	gzReader, err := gzip.NewReader(content)
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		err := gz.Close()
-		if err != nil {
-			d.logger.Printf("Failed to close gzip reader: %s", err)
+		closeError := gzReader.Close()
+		if closeError != nil {
+			d.logger.Printf("Failed to close gzip reader: %s", closeError)
 		}
 	}()
-	result, err := io.ReadAll(gz)
+	result, err := io.ReadAll(gzReader)
 	if err != nil {
 		return "", err
 	}
