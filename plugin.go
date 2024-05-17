@@ -14,6 +14,7 @@ import (
 // Config the plugin configuration.
 type Config struct {
 	Enabled            bool      `json:"enabled"`
+	Debug              bool      `json:"debug"`
 	LogFormat          LogFormat `json:"logFormat"`
 	GenerateLogID      bool      `json:"generateLogId,omitempty"`
 	Name               string    `json:"name,omitempty"`
@@ -84,6 +85,7 @@ type LoggerMiddleware struct {
 func CreateConfig() *Config {
 	return &Config{
 		Enabled:            true,
+		Debug:              false,
 		LogFormat:          TextFormat,
 		GenerateLogID:      true,
 		Name:               "HTTP",
@@ -104,6 +106,9 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	}
 
 	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+	if config.Debug {
+		logger.Printf("traefiklogger middleware config: %+v\n", config)
+	}
 
 	return &LoggerMiddleware{
 		name:                config.Name,
