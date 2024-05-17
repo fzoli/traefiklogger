@@ -8,11 +8,13 @@ import (
 )
 
 type HTTPBodyDecoderFactory struct {
+	logger      *log.Logger
 	rawDecoder  *RawHTTPDecoder
 	gzipDecoder *GZipHTTPDecoder
 }
 
 func (f *HTTPBodyDecoderFactory) create(encoding string) HTTPBodyDecoder {
+	f.logger.Println(encoding)
 	if encoding == "gzip" {
 		return f.gzipDecoder
 	}
@@ -21,6 +23,7 @@ func (f *HTTPBodyDecoderFactory) create(encoding string) HTTPBodyDecoder {
 
 func createHTTPBodyDecoderFactory(logger *log.Logger) *HTTPBodyDecoderFactory {
 	return &HTTPBodyDecoderFactory{
+		logger:      logger,
 		rawDecoder:  &RawHTTPDecoder{},
 		gzipDecoder: &GZipHTTPDecoder{logger: logger},
 	}
