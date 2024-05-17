@@ -1,6 +1,10 @@
 package traefiklogger
 
-import "strings"
+import (
+	"io"
+	"log"
+	"strings"
+)
 
 func containsIgnoreCase(values []string, value string) bool {
 	for _, str := range values {
@@ -37,4 +41,11 @@ func decodeHeaders(value []string, decoder func(string) string) []string {
 		decodedValues[i] = decoder(v)
 	}
 	return decodedValues
+}
+
+func tryClose(closer io.Closer, logger *log.Logger) {
+	err := closer.Close()
+	if err != nil {
+		logger.Printf("Failed to close: %s", err)
+	}
 }
