@@ -10,6 +10,8 @@ entryPoints:
       insecure: true
   websecure:
     address: ":8443"
+    http:
+      tls: {}
     http3:
       advertisedPort: 8443
 api:
