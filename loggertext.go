@@ -29,8 +29,9 @@ func (thl *TextualHTTPLogger) print(record *LogRecord) {
 	}
 
 	if record.RequestBody.Len() > 0 {
+		requestBodyText, _ := record.BodyDecoder.decode(record.RequestBody)
 		builder.WriteString("\nRequest Body:\n")
-		builder.WriteString(record.RequestBody.String())
+		builder.WriteString(requestBodyText)
 		builder.WriteString("\n")
 	}
 
@@ -43,8 +44,9 @@ func (thl *TextualHTTPLogger) print(record *LogRecord) {
 	builder.WriteString(fmt.Sprintf("\nDuration: %.3f ms\n", record.DurationMs))
 
 	if record.ResponseBody.Len() > 0 {
+		responseBodyText, _ := record.BodyDecoder.decode(record.ResponseBody)
 		builder.WriteString("\nResponse Body:\n")
-		builder.WriteString(record.ResponseBody.String())
+		builder.WriteString(responseBodyText)
 		builder.WriteString("\n")
 	}
 

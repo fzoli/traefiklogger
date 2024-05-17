@@ -82,8 +82,7 @@ func (w *LoggerLogWriter) Write(log string) error {
 	return nil
 }
 
-func createHTTPLogger(ctx context.Context, config *Config) HTTPLogger {
-	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+func createHTTPLogger(ctx context.Context, config *Config, logger *log.Logger) HTTPLogger {
 	switch config.LogFormat {
 	case JSONFormat:
 		return createJSONHTTPLogger(ctx, config, logger)

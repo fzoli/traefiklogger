@@ -18,6 +18,8 @@ type JSONHTTPLogger struct {
 }
 
 func (jhl *JSONHTTPLogger) print(record *LogRecord) {
+	requestBodyText, _ := record.BodyDecoder.decode(record.RequestBody)
+	responseBodyText, _ := record.BodyDecoder.decode(record.ResponseBody)
 	logData := struct {
 		Level                 string              `json:"log.level,omitempty"`
 		Time                  string              `json:"@timestamp"`
@@ -50,10 +52,10 @@ func (jhl *JSONHTTPLogger) print(record *LogRecord) {
 		Proto:                 record.Proto,
 		DurationMs:            record.DurationMs,
 		RequestHeaders:        record.RequestHeaders,
-		RequestBody:           record.RequestBody.String(),
+		RequestBody:           requestBodyText,
 		ResponseHeaders:       record.ResponseHeaders,
 		ResponseContentLength: record.ResponseContentLength,
-		ResponseBody:          record.ResponseBody.String(),
+		ResponseBody:          responseBodyText,
 		EcsVersion:            "1.6.0",
 		LogID:                 jhl.uuidGenerator.Generate(),
 	}

@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -61,6 +63,7 @@ type LogRecord struct {
 	ResponseBody          *bytes.Buffer
 	ResponseContentLength int
 	DurationMs            float64
+	BodyDecoder           HTTPBodyDecoder
 }
 
 // LoggerMiddleware a Logger plugin.
@@ -68,6 +71,7 @@ type LoggerMiddleware struct {
 	name                string
 	clock               LoggerClock
 	logger              HTTPLogger
+	bodyDecoderFactory  *HTTPBodyDecoderFactory
 	contentTypes        []string
 	jwtHeaders          []string
 	headerRedacts       []string
@@ -99,10 +103,13 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		}, nil
 	}
 
+	logger := log.New(os.Stdout, "["+config.Name+"] ", log.LstdFlags)
+
 	return &LoggerMiddleware{
 		name:                config.Name,
 		clock:               createClock(ctx),
-		logger:              createHTTPLogger(ctx, config),
+		logger:              createHTTPLogger(ctx, config, logger),
+		bodyDecoderFactory:  createHTTPBodyDecoderFactory(logger),
 		contentTypes:        config.BodyContentTypes,
 		jwtHeaders:          config.JWTHeaders,
 		headerRedacts:       config.HeaderRedacts,
@@ -140,6 +147,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	responseHeaders := m.copyHeaders(w.Header())
 	durationMs := float64(endTime.UnixMicro()-startTime.UnixMicro()) / 1000.0
+	bodyDecoder := m.bodyDecoderFactory.create(w.Header().Get("Content-Encoding"))
 
 	logRecord := &LogRecord{
 		System:                m.name,
@@ -154,6 +162,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseBody:          mrw.body,
 		ResponseContentLength: mrw.length,
 		DurationMs:            durationMs,
+		BodyDecoder:           bodyDecoder,
 	}
 
 	m.logger.print(logRecord)
