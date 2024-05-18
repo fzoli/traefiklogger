@@ -34,7 +34,12 @@ services:
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Enabled=true"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.Name=nginx"
       - "traefik.http.middlewares.nginx-logger.plugin.traefiklogger.LogFormat=json" # remove this line to use text format
-      - "traefik.http.routers.nginx.middlewares=nginx-logger@docker"
+      - "traefik.http.middlewares.nginx-cors.headers.accesscontrolallowmethods=GET,OPTIONS"
+      - "traefik.http.middlewares.nginx-cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.nginx-cors.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.nginx-cors.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.nginx-cors.headers.addvaryheader=true"
+      - "traefik.http.routers.nginx.middlewares=secHeaders@file,nginx-cors@docker,nginx-logger@docker"
     networks:
       - traefik
 
