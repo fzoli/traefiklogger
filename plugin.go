@@ -18,6 +18,7 @@ type Config struct {
 	LogFormat          LogFormat `json:"logFormat"`
 	GenerateLogID      bool      `json:"generateLogId,omitempty"`
 	Name               string    `json:"name,omitempty"`
+	AcceptAny          bool      `json:"acceptAny,omitempty"`
 	BodyContentTypes   []string  `json:"bodyContentTypes,omitempty"`
 	JWTHeaders         []string  `json:"jwtHeaders,omitempty"`
 	HeaderRedacts      []string  `json:"headerRedacts,omitempty"`
@@ -73,6 +74,7 @@ type LoggerMiddleware struct {
 	clock               LoggerClock
 	logger              HTTPLogger
 	bodyDecoderFactory  *HTTPBodyDecoderFactory
+	acceptAny           bool
 	contentTypes        []string
 	jwtHeaders          []string
 	headerRedacts       []string
@@ -89,6 +91,7 @@ func CreateConfig() *Config {
 		LogFormat:          TextFormat,
 		GenerateLogID:      true,
 		Name:               "HTTP",
+		AcceptAny:          false,
 		BodyContentTypes:   []string{},
 		JWTHeaders:         []string{},
 		HeaderRedacts:      []string{},
@@ -115,6 +118,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		clock:               createClock(ctx),
 		logger:              createHTTPLogger(ctx, config, logger),
 		bodyDecoderFactory:  createHTTPBodyDecoderFactory(logger),
+		acceptAny:           config.AcceptAny,
 		contentTypes:        config.BodyContentTypes,
 		jwtHeaders:          config.JWTHeaders,
 		headerRedacts:       config.HeaderRedacts,
@@ -133,7 +137,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mrc := &multiReadCloser{
 		rc:       r.Body,
 		buf:      &bytes.Buffer{},
-		withBody: !hasRedactedBody(r, m.requestBodyRedacts) && needToLogBody(m, r, "Content-Type"),
+		withBody: !hasRedactedBody(r, m.requestBodyRedacts) && needToLogBody(m, r.Header.Get("Content-Type"), false),
 	}
 	r.Body = mrc
 
@@ -141,7 +145,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
-		withBody:       !hasRedactedBody(r, m.responseBodyRedacts) && needToLogBody(m, r, "Accept"),
+		withBody:       !hasRedactedBody(r, m.responseBodyRedacts) && needToLogBody(m, r.Header.Get("Accept"), m.acceptAny),
 	}
 
 	requestHeaders := m.copyHeaders(r.Header)
@@ -150,9 +154,12 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.next.ServeHTTP(mrw, r)
 	endTime := m.clock.Now()
 
-	responseHeaders := m.copyHeaders(w.Header())
+	originalResponseHeaders := w.Header()
+	responseHeaders := m.copyHeaders(originalResponseHeaders)
 	durationMs := float64(endTime.UnixMicro()-startTime.UnixMicro()) / 1000.0
-	bodyDecoder := m.bodyDecoderFactory.create(w.Header().Get("Content-Encoding"))
+
+	bodyDecoder := m.bodyDecoderFactory.create(originalResponseHeaders.Get("Content-Encoding"))
+	responseBuffer := m.selectResponseBodyBuffer(mrw, originalResponseHeaders.Get("Content-Type"))
 
 	logRecord := &LogRecord{
 		System:                m.name,
@@ -164,7 +171,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		RequestHeaders:        requestHeaders,
 		RequestBody:           mrc.buf,
 		ResponseHeaders:       responseHeaders,
-		ResponseBody:          mrw.body,
+		ResponseBody:          responseBuffer,
 		ResponseContentLength: mrw.length,
 		DurationMs:            durationMs,
 		BodyDecoder:           bodyDecoder,
@@ -173,9 +180,12 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.logger.print(logRecord)
 }
 
-func needToLogBody(m *LoggerMiddleware, r *http.Request, header string) bool {
+func needToLogBody(m *LoggerMiddleware, current string, acceptAny bool) bool {
 	for _, contentType := range m.contentTypes {
-		if strings.Contains(strings.ToLower(r.Header.Get(header)), strings.ToLower(contentType)) {
+		if acceptAny && (current == "" || current == "*/*") {
+			return true
+		}
+		if strings.Contains(strings.ToLower(current), strings.ToLower(contentType)) {
 			return true
 		}
 	}
@@ -193,6 +203,13 @@ func hasRedactedBody(r *http.Request, redacts []string) bool {
 		}
 	}
 	return false
+}
+
+func (m *LoggerMiddleware) selectResponseBodyBuffer(mrw *multiResponseWriter, contentType string) *bytes.Buffer {
+	if needToLogBody(m, contentType, false) {
+		return mrw.body
+	}
+	return &bytes.Buffer{}
 }
 
 func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
