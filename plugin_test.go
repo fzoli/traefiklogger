@@ -220,6 +220,33 @@ func TestEmptyPost(t *testing.T) {
 func TestGet(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
+	ctx := createContext(t, "127.0.0.1 GET /get: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\n\nResponse Content Length: 1\n\nDuration: 0.000 ms\n\nResponse Body:\n5\n\n")
+
+	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/get", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.RemoteAddr = "127.0.0.1"
+	req.Header.Set("Accept", "text/plain")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+
+	// Check the response body
+	if recorder.Body.String() != "5" {
+		t.Errorf("Expected response body: '5', got: '%s'", recorder.Body.String())
+	}
+}
+
+func TestGetWithoutHeaders(t *testing.T) {
+	cfg := traefiklogger.CreateConfig()
+	cfg.SilentHeaders = true
+
 	ctx := createContext(t, "127.0.0.1 GET /get: 200 OK HTTP/1.1\n\nResponse Content Length: 1\n\nDuration: 0.000 ms\n\nResponse Body:\n5\n\n")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(alwaysFive), cfg, "logger-plugin")
@@ -232,6 +259,7 @@ func TestGet(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "127.0.0.1"
+	req.Header.Set("Accept", "text/plain")
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)

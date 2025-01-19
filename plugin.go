@@ -19,6 +19,7 @@ type Config struct {
 	GenerateLogID      bool      `json:"generateLogId,omitempty"`
 	Name               string    `json:"name,omitempty"`
 	AcceptAny          bool      `json:"acceptAny,omitempty"`
+	SilentHeaders      bool      `json:"silentHeaders,omitempty"`
 	BodyContentTypes   []string  `json:"bodyContentTypes,omitempty"`
 	JWTHeaders         []string  `json:"jwtHeaders,omitempty"`
 	HeaderRedacts      []string  `json:"headerRedacts,omitempty"`
@@ -75,6 +76,7 @@ type LoggerMiddleware struct {
 	logger              HTTPLogger
 	bodyDecoderFactory  *HTTPBodyDecoderFactory
 	acceptAny           bool
+	silentHeaders       bool
 	contentTypes        []string
 	jwtHeaders          []string
 	headerRedacts       []string
@@ -92,6 +94,7 @@ func CreateConfig() *Config {
 		GenerateLogID:      true,
 		Name:               "HTTP",
 		AcceptAny:          false,
+		SilentHeaders:      false,
 		BodyContentTypes:   []string{},
 		JWTHeaders:         []string{},
 		HeaderRedacts:      []string{},
@@ -119,6 +122,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		logger:              createHTTPLogger(ctx, config, logger),
 		bodyDecoderFactory:  createHTTPBodyDecoderFactory(logger),
 		acceptAny:           config.AcceptAny,
+		silentHeaders:       config.SilentHeaders,
 		contentTypes:        config.BodyContentTypes,
 		jwtHeaders:          config.JWTHeaders,
 		headerRedacts:       config.HeaderRedacts,
@@ -214,6 +218,9 @@ func (m *LoggerMiddleware) selectResponseBodyBuffer(mrw *multiResponseWriter, co
 
 func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 	newHeader := make(http.Header)
+	if m.silentHeaders {
+		return newHeader
+	}
 	for key, value := range original {
 		if containsIgnoreCase(m.headerRedacts, key) {
 			newHeader[key] = decodeHeaders(value, redact)
