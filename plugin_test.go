@@ -116,7 +116,11 @@ func gzipAlwaysFive(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 
 	gz := gzip.NewWriter(rw)
-	defer gz.Close()
+	defer func() {
+		if err := gz.Close(); err != nil {
+			log.Printf("Failed to close gz: %v", err)
+		}
+	}()
 
 	fmt.Fprintf(gz, "%d", 5)
 }
