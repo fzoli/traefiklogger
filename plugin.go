@@ -66,7 +66,8 @@ type LogRecord struct {
 	ResponseBody          *bytes.Buffer
 	ResponseContentLength int
 	DurationMs            float64
-	BodyDecoder           HTTPBodyDecoder
+	RequestBodyDecoder    HTTPBodyDecoder
+	ResponseBodyDecoder   HTTPBodyDecoder
 }
 
 // LoggerMiddleware a Logger plugin.
@@ -162,7 +163,8 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	responseHeaders := m.copyHeaders(originalResponseHeaders)
 	durationMs := float64(endTime.UnixMicro()-startTime.UnixMicro()) / 1000.0
 
-	bodyDecoder := m.bodyDecoderFactory.create(originalResponseHeaders.Get("Content-Encoding"))
+	requestBodyDecoder := m.bodyDecoderFactory.create(requestHeaders.Get("Content-Encoding"))
+	responseBodyDecoder := m.bodyDecoderFactory.create(originalResponseHeaders.Get("Content-Encoding"))
 	responseBuffer := m.selectResponseBodyBuffer(mrw, originalResponseHeaders.Get("Content-Type"))
 
 	logRecord := &LogRecord{
@@ -178,7 +180,8 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ResponseBody:          responseBuffer,
 		ResponseContentLength: mrw.length,
 		DurationMs:            durationMs,
-		BodyDecoder:           bodyDecoder,
+		RequestBodyDecoder:    requestBodyDecoder,
+		ResponseBodyDecoder:   responseBodyDecoder,
 	}
 
 	m.logger.print(logRecord)

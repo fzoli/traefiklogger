@@ -110,8 +110,22 @@ func alwaysFive(rw http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(rw, "%d", 5)
 }
 
-// alwaysFive does not read the request, just returns GZip encoded HTTP OK with response body 5.
+// gzipAlwaysFive reads the request then returns GZip encoded HTTP OK with response body 5.
 func gzipAlwaysFive(rw http.ResponseWriter, req *http.Request) {
+	// Read the request body (to appear in logs)
+	_, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer func(Body io.ReadCloser) {
+		cerr := Body.Close()
+		if cerr != nil {
+			log.Printf("Failed to close reader: %v", cerr)
+		}
+	}(req.Body)
+
+	// Return gzip response
 	rw.Header().Set("Content-Encoding", "gzip")
 	rw.WriteHeader(http.StatusOK)
 
@@ -259,17 +273,18 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestGetGzip(t *testing.T) {
+func TestPostGzipResponseWithRawRequest(t *testing.T) {
 	cfg := traefiklogger.CreateConfig()
 
-	ctx := createContext(t, "127.0.0.1 GET /get: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\n\nResponse Headers:\nContent-Encoding: gzip\n\nResponse Content Length: 25\n\nDuration: 0.000 ms\n\nResponse Body:\n5\n\n")
+	ctx := createContext(t, "127.0.0.1 POST /post: 200 OK HTTP/1.1\n\nRequest Headers:\nAccept: text/plain\n\nRequest Body:\nHello\n\nResponse Headers:\nContent-Encoding: gzip\n\nResponse Content Length: 25\n\nDuration: 0.000 ms\n\nResponse Body:\n5\n\n")
 
 	handler, err := traefiklogger.New(ctx, http.HandlerFunc(gzipAlwaysFive), cfg, "logger-plugin")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/get", nil)
+	reqBody := strings.NewReader("Hello")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "/post", reqBody)
 	if err != nil {
 		t.Fatal(err)
 	}

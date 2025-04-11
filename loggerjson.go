@@ -18,8 +18,8 @@ type JSONHTTPLogger struct {
 }
 
 func (jhl *JSONHTTPLogger) print(record *LogRecord) {
-	requestBodyText, _ := record.BodyDecoder.decode(record.RequestBody)
-	responseBodyText, _ := record.BodyDecoder.decode(record.ResponseBody)
+	requestBodyText, _ := record.RequestBodyDecoder.decode(record.RequestBody)
+	responseBodyText, _ := record.ResponseBodyDecoder.decode(record.ResponseBody)
 	logData := struct {
 		Level                 string              `json:"log.level,omitempty"`
 		Time                  string              `json:"@timestamp"`
