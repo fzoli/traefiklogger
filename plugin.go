@@ -2,10 +2,13 @@
 package traefiklogger
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -264,6 +267,14 @@ func (w *multiResponseWriter) Flush() {
 	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
 		fl.Flush()
 	}
+}
+
+func (w *multiResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("%T is not a http.Hijacker", w.ResponseWriter)
+	}
+	return hijacker.Hijack()
 }
 
 type multiReadCloser struct {
