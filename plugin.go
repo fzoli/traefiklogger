@@ -260,6 +260,12 @@ func (w *multiResponseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+func (w *multiResponseWriter) Flush() {
+	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
+		fl.Flush()
+	}
+}
+
 type multiReadCloser struct {
 	rc       io.ReadCloser
 	buf      *bytes.Buffer
