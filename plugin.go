@@ -141,7 +141,9 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.next.ServeHTTP(w, r)
 		return
 	}
-	if r.Header.Get("Accept") == "text/event-stream" {
+
+	accept := r.Header.Get("Accept")
+	if accept == "text/event-stream" || strings.HasPrefix(accept, "application/grpc-web") {
 		// Disable plugin while https://github.com/traefik/yaegi/issues/1600 is not resolved.
 		m.next.ServeHTTP(w, r)
 		return
