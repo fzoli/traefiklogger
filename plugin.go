@@ -249,6 +249,8 @@ type multiResponseWriter struct {
 	withBody bool
 }
 
+var _ http.ResponseWriter = (*multiResponseWriter)(nil)
+
 func (w *multiResponseWriter) WriteHeader(status int) {
 	w.ResponseWriter.WriteHeader(status)
 	w.status = status
@@ -263,11 +265,15 @@ func (w *multiResponseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+var _ http.Flusher = (*multiResponseWriter)(nil)
+
 func (w *multiResponseWriter) Flush() {
 	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
 		fl.Flush()
 	}
 }
+
+var _ http.Hijacker = (*multiResponseWriter)(nil)
 
 func (w *multiResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijacker, ok := w.ResponseWriter.(http.Hijacker)
@@ -275,6 +281,15 @@ func (w *multiResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, fmt.Errorf("%T is not a http.Hijacker", w.ResponseWriter)
 	}
 	return hijacker.Hijack()
+}
+
+var _ http.Pusher = (*multiResponseWriter)(nil)
+
+func (w *multiResponseWriter) Push(target string, opts *http.PushOptions) error {
+	if pusher, ok := w.ResponseWriter.(http.Pusher); ok {
+		return pusher.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 type multiReadCloser struct {
