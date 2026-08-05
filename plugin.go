@@ -23,6 +23,7 @@ type Config struct {
 	Name               string    `json:"name,omitempty"`
 	AcceptAny          bool      `json:"acceptAny,omitempty"`
 	SilentHeaders      bool      `json:"silentHeaders,omitempty"`
+	FlushWrites        bool      `json:"flushWrites,omitempty"`
 	BodyContentTypes   []string  `json:"bodyContentTypes,omitempty"`
 	JWTHeaders         []string  `json:"jwtHeaders,omitempty"`
 	HeaderRedacts      []string  `json:"headerRedacts,omitempty"`
@@ -81,6 +82,7 @@ type LoggerMiddleware struct {
 	bodyDecoderFactory  *HTTPBodyDecoderFactory
 	acceptAny           bool
 	silentHeaders       bool
+	flushWrites         bool
 	contentTypes        []string
 	jwtHeaders          []string
 	headerRedacts       []string
@@ -99,6 +101,7 @@ func CreateConfig() *Config {
 		Name:               "HTTP",
 		AcceptAny:          false,
 		SilentHeaders:      false,
+		FlushWrites:        false,
 		BodyContentTypes:   []string{},
 		JWTHeaders:         []string{},
 		HeaderRedacts:      []string{},
@@ -127,6 +130,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		bodyDecoderFactory:  createHTTPBodyDecoderFactory(logger),
 		acceptAny:           config.AcceptAny,
 		silentHeaders:       config.SilentHeaders,
+		flushWrites:         config.FlushWrites,
 		contentTypes:        config.BodyContentTypes,
 		jwtHeaders:          config.JWTHeaders,
 		headerRedacts:       config.HeaderRedacts,
@@ -143,7 +147,7 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accept := r.Header.Get("Accept")
-	if accept == "text/event-stream" || strings.HasPrefix(accept, "application/grpc-web") {
+	if (!m.flushWrites && accept == "text/event-stream") || strings.HasPrefix(accept, "application/grpc-web") {
 		// Disable plugin while https://github.com/traefik/yaegi/issues/1600 is not resolved.
 		m.next.ServeHTTP(w, r)
 		return
@@ -156,8 +160,15 @@ func (m *LoggerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = mrc
 
+	var flusher http.Flusher
+	if f, ok := w.(http.Flusher); ok {
+		flusher = f
+	}
+
 	mrw := &multiResponseWriter{
 		ResponseWriter: w,
+		flusher:        flusher,
+		flushWrites:    m.flushWrites,
 		status:         200, // Default is 200
 		body:           &bytes.Buffer{},
 		withBody:       !hasRedactedBody(r, m.responseBodyRedacts) && needToLogBody(m, r.Header.Get("Accept"), m.acceptAny),
@@ -250,10 +261,12 @@ func (m *LoggerMiddleware) copyHeaders(original http.Header) http.Header {
 
 type multiResponseWriter struct {
 	http.ResponseWriter
-	status   int
-	length   int
-	body     *bytes.Buffer
-	withBody bool
+	flusher     http.Flusher
+	flushWrites bool
+	status      int
+	length      int
+	body        *bytes.Buffer
+	withBody    bool
 }
 
 var _ http.ResponseWriter = (*multiResponseWriter)(nil)
@@ -265,6 +278,9 @@ func (w *multiResponseWriter) WriteHeader(status int) {
 
 func (w *multiResponseWriter) Write(b []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(b)
+	if w.flushWrites {
+		w.Flush()
+	}
 	w.length += n
 	if w.withBody {
 		w.body.Write(b)
@@ -275,8 +291,8 @@ func (w *multiResponseWriter) Write(b []byte) (int, error) {
 var _ http.Flusher = (*multiResponseWriter)(nil)
 
 func (w *multiResponseWriter) Flush() {
-	if fl, ok := w.ResponseWriter.(http.Flusher); ok {
-		fl.Flush()
+	if w.flusher != nil {
+		w.flusher.Flush()
 	}
 }
 
